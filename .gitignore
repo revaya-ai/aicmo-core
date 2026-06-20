@@ -1,4 +1,6 @@
 data/*.db
+data/notion_state.json
+outputs/notion-mirror.json
 .env
 __pycache__/
 *.pyc
