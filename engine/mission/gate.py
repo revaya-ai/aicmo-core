@@ -139,6 +139,20 @@ CARD = """
   </form>
 </div>"""
 
+SPEND_CARD = """
+<div class="card">
+  <div class="meta">
+    <span class="pillar">Ad recommended</span>
+    <p class="hook">{hook}</p>
+    <p class="body">{rationale}</p>
+    <p class="qc">Budget: <b>${budget}</b> &middot; Audience: {audience}</p>
+  </div>
+  <form class="actions" method="post" action="/spend/{id}">
+    <button class="approve" name="decision" value="ad_approved">Approve spend</button>
+    <button class="reject"  name="decision" value="decline">Decline</button>
+  </form>
+</div>"""
+
 
 def _esc(text) -> str:
     s = "" if text is None else str(text)
@@ -183,6 +197,23 @@ def create_app():
                     )
                 )
             cards = "".join(built)
+        spend_rows = db.list_by_status(Status.AD_RECOMMENDED)
+        spend_built = []
+        for p in spend_rows:
+            spend_built.append(
+                SPEND_CARD.format(
+                    hook=_esc(p.get("hook") or ""),
+                    rationale=_esc(p.get("human_note") or ""),
+                    budget=_esc(p.get("ad_budget")),
+                    audience=_esc(p.get("ad_audience") or ""),
+                    id=_esc(p["id"]),
+                )
+            )
+        if spend_built:
+            cards = cards + (
+                '<h2 style="font-family:Fraunces,Georgia,serif;font-size:18px;'
+                'margin:28px 0 12px;">Spend approvals</h2>' + "".join(spend_built)
+            )
         return PAGE.format(count=count, cards=cards)
 
     @app.route("/render/<path:img_path>")
@@ -202,6 +233,21 @@ def create_app():
             Status.NEEDS_REVISION: "Human asked for a revision.",
         }
         db.advance(post_id, decision, human_note=labels[decision])
+        if decision == Status.APPROVED:
+            from engine.mission import driver
+            driver.drive(post_id)  # walk it to the spend gate
+        return redirect("/")
+
+    @app.route("/spend/<post_id>", methods=["POST"])
+    def spend(post_id):
+        decision = request.form["decision"]
+        if decision == "ad_approved":
+            from engine.ads import ads_agent
+            ads_agent.approve_spend(post_id, approved_by="human via gate")
+        elif decision == "decline":
+            db.update_post(post_id, ad_status="declined")
+        else:
+            return "bad decision", 400
         return redirect("/")
 
     return app
