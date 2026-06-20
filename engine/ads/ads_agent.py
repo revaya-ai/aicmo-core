@@ -129,5 +129,16 @@ def run(post_id: str, auto_approve: bool = False) -> None:
     approve_spend(post_id, approved_by="AUTO (demo loop)")
 
 
+def _campaign_id(post_id: str) -> str:
+    # Demo-safe stub id. Swap for a real Meta/LinkedIn campaign id later.
+    return f"fake-campaign-{post_id[:8]}"
+
+
 def approve_spend(post_id: str, approved_by: str) -> None:
-    raise NotImplementedError  # implemented in Task 6
+    """Human (or auto demo) approved the spend: go live via the stub pusher."""
+    advance(post_id, Status.AD_APPROVED, ad_spend_approved_by=approved_by)
+    campaign = _campaign_id(post_id)
+    # TODO(stretch): create the real campaign via Meta/LinkedIn Ads API here.
+    update_post(post_id, ad_status=f"live:{campaign}")
+    advance(post_id, Status.AD_LIVE)
+    print(f"    [ads] STUB campaign live: {campaign} (approved by {approved_by})")
