@@ -23,19 +23,20 @@
 ### Task 1: Test harness with isolated temp DB
 
 **Files:**
-- Create: `tests/conftest.py`
-- Create: `tests/__init__.py`
+- Create: `tests/mission/conftest.py`
+
+**Merge-safety note:** Card 3's tests live under `tests/mission/` with their own
+`conftest.py` and NO `__init__.py` anywhere. pytest auto-discovers a `conftest.py`
+per directory, so there are zero shared test files for Brain/Studio to collide
+with at merge time. Do not create `tests/__init__.py` or `tests/conftest.py`.
 
 **Interfaces:**
 - Produces: a pytest fixture `fresh_db` that points `db.DB_PATH` at a temp file, calls `db.init_db()`, and yields. Used by every later test.
 
-- [ ] **Step 1: Create the empty package marker**
+- [ ] **Step 1: Write the fixture**
 
-Create `tests/__init__.py` with no content (empty file).
-
-- [ ] **Step 2: Write the fixture**
-
-Create `tests/conftest.py`:
+Create `tests/mission/conftest.py` (note: three `dirname` calls — this file is
+two directories deep at `tests/mission/`, so reach the repo root with three):
 
 ```python
 import os
@@ -43,8 +44,8 @@ import sys
 
 import pytest
 
-# Make repo root importable so `import db` works from tests/.
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# tests/mission/conftest.py -> tests/mission -> tests -> repo root.
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
@@ -63,17 +64,17 @@ def fresh_db(tmp_path):
         db.DB_PATH = original
 ```
 
-- [ ] **Step 3: Sanity-check the fixture**
+- [ ] **Step 2: Sanity-check the fixture**
 
-Create a temporary check inside `tests/conftest.py`? No — instead verify by writing a one-off test in Task 2. For now confirm pytest is installed:
+Confirm pytest is installed and collects cleanly (0 tests is expected here):
 
-Run: `python -m pytest --version`
-Expected: prints a pytest version (e.g. `pytest 8.x`). If missing: `pip install pytest`.
+Run: `.venv/bin/python -m pytest tests/mission/ -v`
+Expected: `no tests ran` / 0 collected, exit code 5, no import errors.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add tests/__init__.py tests/conftest.py
+git add tests/mission/conftest.py
 git commit -m "test: temp-db fixture for Card 3 stations"
 ```
 
@@ -83,7 +84,7 @@ git commit -m "test: temp-db fixture for Card 3 stations"
 
 **Files:**
 - Modify: `engine/mission/schedule.py`
-- Test: `tests/test_schedule.py`
+- Test: `tests/mission/test_schedule.py`
 
 **Interfaces:**
 - Consumes: `fresh_db` fixture; a post at status `approved`.
@@ -91,7 +92,7 @@ git commit -m "test: temp-db fixture for Card 3 stations"
 
 - [ ] **Step 1: Write the failing test**
 
-Create `tests/test_schedule.py`:
+Create `tests/mission/test_schedule.py`:
 
 ```python
 from datetime import datetime
@@ -115,7 +116,7 @@ def test_schedule_sets_future_slot(fresh_db):
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `python -m pytest tests/test_schedule.py -v`
+Run: `.venv/bin/python -m pytest tests/mission/test_schedule.py -v`
 Expected: FAIL (stub schedules "now + 1 hour" which passes the future check, so this may PASS already). If it PASSES, that is fine — the stub already satisfies the contract; proceed to strengthen it in Step 3 for the per-platform slot. Add this stricter assertion to the test first and re-run to see it FAIL:
 
 ```python
@@ -128,7 +129,7 @@ def test_linkedin_slot_is_weekday_morning(fresh_db):
     assert slot.weekday() < 5  # Mon-Fri
 ```
 
-Run again: `python -m pytest tests/test_schedule.py::test_linkedin_slot_is_weekday_morning -v`
+Run again: `.venv/bin/python -m pytest tests/mission/test_schedule.py::test_linkedin_slot_is_weekday_morning -v`
 Expected: FAIL (stub returns now+1h, wrong hour).
 
 - [ ] **Step 3: Implement the real slot picker**
@@ -168,13 +169,13 @@ def run(post_id: str, auto_approve: bool = False) -> None:
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `python -m pytest tests/test_schedule.py -v`
+Run: `.venv/bin/python -m pytest tests/mission/test_schedule.py -v`
 Expected: PASS (both tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add engine/mission/schedule.py tests/test_schedule.py
+git add engine/mission/schedule.py tests/mission/test_schedule.py
 git commit -m "feat(mission): per-platform scheduling slot"
 ```
 
@@ -184,7 +185,7 @@ git commit -m "feat(mission): per-platform scheduling slot"
 
 **Files:**
 - Modify: `engine/mission/publish.py`
-- Test: `tests/test_publish.py`
+- Test: `tests/mission/test_publish.py`
 
 **Interfaces:**
 - Consumes: post at status `scheduled`.
@@ -192,7 +193,7 @@ git commit -m "feat(mission): per-platform scheduling slot"
 
 - [ ] **Step 1: Write the failing test**
 
-Create `tests/test_publish.py`:
+Create `tests/mission/test_publish.py`:
 
 ```python
 import db
@@ -214,7 +215,7 @@ def test_publish_sets_platform_url(fresh_db):
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `python -m pytest tests/test_publish.py -v`
+Run: `.venv/bin/python -m pytest tests/mission/test_publish.py -v`
 Expected: FAIL (stub URL is `https://example.test/...`).
 
 - [ ] **Step 3: Implement believable publish**
@@ -247,13 +248,13 @@ def run(post_id: str, auto_approve: bool = False) -> None:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `python -m pytest tests/test_publish.py -v`
+Run: `.venv/bin/python -m pytest tests/mission/test_publish.py -v`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add engine/mission/publish.py tests/test_publish.py
+git add engine/mission/publish.py tests/mission/test_publish.py
 git commit -m "feat(mission): platform-shaped publish url"
 ```
 
@@ -263,7 +264,7 @@ git commit -m "feat(mission): platform-shaped publish url"
 
 **Files:**
 - Modify: `engine/mission/analytics.py`
-- Test: `tests/test_analytics.py`
+- Test: `tests/mission/test_analytics.py`
 
 **Interfaces:**
 - Consumes: post at status `published`.
@@ -271,7 +272,7 @@ git commit -m "feat(mission): platform-shaped publish url"
 
 - [ ] **Step 1: Write the failing test**
 
-Create `tests/test_analytics.py`:
+Create `tests/mission/test_analytics.py`:
 
 ```python
 import json
@@ -308,7 +309,7 @@ def test_metrics_vary_by_post(fresh_db):
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `python -m pytest tests/test_analytics.py -v`
+Run: `.venv/bin/python -m pytest tests/mission/test_analytics.py -v`
 Expected: FAIL on `test_metrics_vary_by_post` (stub returns identical hardcoded metrics).
 
 - [ ] **Step 3: Implement deterministic-but-varied metrics**
@@ -351,13 +352,13 @@ def run(post_id: str, auto_approve: bool = False) -> None:
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `python -m pytest tests/test_analytics.py -v`
+Run: `.venv/bin/python -m pytest tests/mission/test_analytics.py -v`
 Expected: PASS (both tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add engine/mission/analytics.py tests/test_analytics.py
+git add engine/mission/analytics.py tests/mission/test_analytics.py
 git commit -m "feat(mission): varied deterministic analytics"
 ```
 
@@ -367,7 +368,7 @@ git commit -m "feat(mission): varied deterministic analytics"
 
 **Files:**
 - Modify: `engine/ads/ads_agent.py`
-- Test: `tests/test_ads_recommend.py`
+- Test: `tests/mission/test_ads_recommend.py`
 
 **Interfaces:**
 - Consumes: post at status `analyzed` with `metrics_json`.
@@ -378,7 +379,7 @@ git commit -m "feat(mission): varied deterministic analytics"
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `tests/test_ads_recommend.py`:
+Create `tests/mission/test_ads_recommend.py`:
 
 ```python
 import json
@@ -457,7 +458,7 @@ def test_demo_force_winner_env(fresh_db, monkeypatch):
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `python -m pytest tests/test_ads_recommend.py -v`
+Run: `.venv/bin/python -m pytest tests/mission/test_ads_recommend.py -v`
 Expected: FAIL (`winner_score` and `build_rationale` not defined; current run uses `follows > 10`).
 
 - [ ] **Step 3: Implement scoring + recommendation**
@@ -605,13 +606,13 @@ def approve_spend(post_id: str, approved_by: str) -> None:
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `python -m pytest tests/test_ads_recommend.py -v`
+Run: `.venv/bin/python -m pytest tests/mission/test_ads_recommend.py -v`
 Expected: PASS (all five, including the calibration guard and the force-winner override). The winner tests use default `auto_approve=False`, so `approve_spend` is never called.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add engine/ads/ads_agent.py tests/test_ads_recommend.py
+git add engine/ads/ads_agent.py tests/mission/test_ads_recommend.py
 git commit -m "feat(ads): real winner score + Claude rationale with fallback"
 ```
 
@@ -621,7 +622,7 @@ git commit -m "feat(ads): real winner score + Claude rationale with fallback"
 
 **Files:**
 - Modify: `engine/ads/ads_agent.py`
-- Test: `tests/test_ads_spend.py`
+- Test: `tests/mission/test_ads_spend.py`
 
 **Interfaces:**
 - Consumes: post at status `ad_recommended`.
@@ -629,7 +630,7 @@ git commit -m "feat(ads): real winner score + Claude rationale with fallback"
 
 - [ ] **Step 1: Write the failing test**
 
-Create `tests/test_ads_spend.py`:
+Create `tests/mission/test_ads_spend.py`:
 
 ```python
 import db
@@ -674,7 +675,7 @@ def test_auto_approve_runs_full_chain(fresh_db):
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `python -m pytest tests/test_ads_spend.py -v`
+Run: `.venv/bin/python -m pytest tests/mission/test_ads_spend.py -v`
 Expected: FAIL (`approve_spend` raises `NotImplementedError`).
 
 - [ ] **Step 3: Replace the placeholder with the real pusher**
@@ -706,13 +707,13 @@ def approve_spend(post_id: str, approved_by: str) -> None:
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `python -m pytest tests/test_ads_spend.py -v`
+Run: `.venv/bin/python -m pytest tests/mission/test_ads_spend.py -v`
 Expected: PASS (both).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add engine/ads/ads_agent.py tests/test_ads_spend.py
+git add engine/ads/ads_agent.py tests/mission/test_ads_spend.py
 git commit -m "feat(ads): spend approval pusher to ad_live"
 ```
 
@@ -722,7 +723,7 @@ git commit -m "feat(ads): spend approval pusher to ad_live"
 
 **Files:**
 - Create: `engine/mission/driver.py`
-- Test: `tests/test_driver.py`
+- Test: `tests/mission/test_driver.py`
 
 **Interfaces:**
 - Consumes: a post at status `approved`; the station modules from Tasks 2–6.
@@ -730,7 +731,7 @@ git commit -m "feat(ads): spend approval pusher to ad_live"
 
 - [ ] **Step 1: Write the failing test**
 
-Create `tests/test_driver.py`:
+Create `tests/mission/test_driver.py`:
 
 ```python
 import db
@@ -775,7 +776,7 @@ def test_drive_loser_stops_at_analyzed(fresh_db, monkeypatch):
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `python -m pytest tests/test_driver.py -v`
+Run: `.venv/bin/python -m pytest tests/mission/test_driver.py -v`
 Expected: FAIL (`engine.mission.driver` does not exist).
 
 - [ ] **Step 3: Implement the driver**
@@ -806,13 +807,13 @@ def drive(post_id: str, auto_approve: bool = False) -> str:
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `python -m pytest tests/test_driver.py -v`
+Run: `.venv/bin/python -m pytest tests/mission/test_driver.py -v`
 Expected: PASS (all three).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add engine/mission/driver.py tests/test_driver.py
+git add engine/mission/driver.py tests/mission/test_driver.py
 git commit -m "feat(mission): shared pipeline driver"
 ```
 
@@ -822,7 +823,7 @@ git commit -m "feat(mission): shared pipeline driver"
 
 **Files:**
 - Modify: `engine/mission/gate.py`
-- Test: `tests/test_gate_routes.py`
+- Test: `tests/mission/test_gate_routes.py`
 
 **Interfaces:**
 - Consumes: `create_app()` Flask factory; `driver.drive`; `ads_agent.approve_spend`.
@@ -830,7 +831,7 @@ git commit -m "feat(mission): shared pipeline driver"
 
 - [ ] **Step 1: Write the failing test**
 
-Create `tests/test_gate_routes.py`:
+Create `tests/mission/test_gate_routes.py`:
 
 ```python
 import json
@@ -885,7 +886,7 @@ def test_reject_still_bounces(fresh_db, monkeypatch):
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `python -m pytest tests/test_gate_routes.py -v`
+Run: `.venv/bin/python -m pytest tests/mission/test_gate_routes.py -v`
 Expected: FAIL (`test_approve_drives_pipeline` leaves status at `approved`; `/spend` route 404s).
 
 - [ ] **Step 3a: Add a SPEND_CARD template constant**
@@ -972,13 +973,13 @@ In `create_app()`, after the `decide()` route and before `return app`, add:
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `python -m pytest tests/test_gate_routes.py -v`
+Run: `.venv/bin/python -m pytest tests/mission/test_gate_routes.py -v`
 Expected: PASS (all three).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add engine/mission/gate.py tests/test_gate_routes.py
+git add engine/mission/gate.py tests/mission/test_gate_routes.py
 git commit -m "feat(mission): approve drives pipeline + spend gate on board"
 ```
 
@@ -988,7 +989,7 @@ git commit -m "feat(mission): approve drives pipeline + spend gate on board"
 
 **Files:**
 - Modify: `run.py`
-- Test: `tests/test_full_loop.py`
+- Test: `tests/mission/test_full_loop.py`
 
 **Interfaces:**
 - Consumes: `driver.drive`; existing brain/studio/gate stubs.
@@ -996,7 +997,7 @@ git commit -m "feat(mission): approve drives pipeline + spend gate on board"
 
 - [ ] **Step 1: Write the failing test**
 
-Create `tests/test_full_loop.py`:
+Create `tests/mission/test_full_loop.py`:
 
 ```python
 import importlib
@@ -1025,7 +1026,7 @@ def test_full_loop_reaches_ad_live(fresh_db, monkeypatch):
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `python -m pytest tests/test_full_loop.py -v`
+Run: `.venv/bin/python -m pytest tests/mission/test_full_loop.py -v`
 Expected: PASS or FAIL depending on stub behavior — the current `run.py` already reaches `ad_live` via the stub. Confirm it PASSES; if it does, the test now guards the refactor in Step 3. Proceed to Step 3 and re-run to ensure it still passes after the refactor.
 
 - [ ] **Step 3: Refactor run.py to call the driver**
@@ -1065,13 +1066,13 @@ Keep the existing import lines for the stations and `get_post`. Remove the now-u
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `python -m pytest tests/test_full_loop.py -v`
+Run: `.venv/bin/python -m pytest tests/mission/test_full_loop.py -v`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add run.py tests/test_full_loop.py
+git add run.py tests/mission/test_full_loop.py
 git commit -m "refactor: run.py drives downstream via shared driver"
 ```
 
@@ -1081,21 +1082,21 @@ git commit -m "refactor: run.py drives downstream via shared driver"
 
 **Files:**
 - Modify: `README.md` (add a "Card 3 — Mission Control" section)
-- Test: all of `tests/`
+- Test: all of `tests/mission/`
 
 - [ ] **Step 1: Run the whole suite**
 
-Run: `python -m pytest tests/ -v`
+Run: `.venv/bin/python -m pytest tests/mission/ -v`
 Expected: ALL PASS.
 
 - [ ] **Step 2: Manual smoke — auto loop**
 
-Run: `python run.py "why your competitors all sound the same"`
+Run: `.venv/bin/python run.py "why your competitors all sound the same"`
 Expected: prints status transitions ending at `final status: ad_live` (winner) or `analyzed` (non-winner — re-run if you want to demo the ad path, or rely on the forced-winner tests).
 
 - [ ] **Step 3: Manual smoke — the board (manual, not automated)**
 
-Run: `python engine/mission/gate.py`
+Run: `.venv/bin/python engine/mission/gate.py`
 Open `http://localhost:5050`. With a post sitting at `qc_review` (create one via the pipeline up to the gate), click **Approve** and confirm a Spend-approval card appears; click **Approve spend** and confirm it disappears (now `ad_live`). Stop the server with Ctrl-C.
 
 - [ ] **Step 4: Add README section**
@@ -1105,12 +1106,12 @@ Append to `README.md`:
 ```markdown
 ## Card 3 — Mission Control
 
-- `engine/mission/gate.py` — the human board (two gates): content Approve/Revise/Reject and ad spend Approve/Decline. Run: `python engine/mission/gate.py` → http://localhost:5050
+- `engine/mission/gate.py` — the human board (two gates): content Approve/Revise/Reject and ad spend Approve/Decline. Run: `.venv/bin/python engine/mission/gate.py` → http://localhost:5050
 - `engine/mission/driver.py` — `drive(post_id)` runs schedule → publish → analytics → ads after approval; shared by the board and `run.py`.
 - `engine/mission/{schedule,publish,analytics}.py` — demo-safe smart stubs (no API keys).
 - `engine/ads/ads_agent.py` — winner score + Claude rationale (templated fallback) + stub ad pusher behind the spend gate.
 
-Tests: `python -m pytest tests/ -v`
+Tests: `.venv/bin/python -m pytest tests/mission/ -v`
 ```
 
 - [ ] **Step 5: Commit**

@@ -3,8 +3,8 @@ import sys
 
 import pytest
 
-# Make repo root importable so `import db` works from tests/.
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# tests/mission/conftest.py -> tests/mission -> tests -> repo root.
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 

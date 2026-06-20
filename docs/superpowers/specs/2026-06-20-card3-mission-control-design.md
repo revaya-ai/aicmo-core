@@ -104,6 +104,11 @@ green with stubs and the standard library.
 
 ## Testing
 
+Tests live under `tests/mission/` with their own `conftest.py` and no
+`__init__.py` — a merge-safe layout so Brain/Studio test folders can never
+collide with Card 3's at integration. Run with
+`.venv/bin/python -m pytest tests/mission/ -v`.
+
 - **Full-loop pytest** (temp DB, `auto_approve=True`): post reaches `ad_live`
   with all fields populated.
 - **Not-a-winner test:** low-engagement metrics → ads agent does nothing, post
