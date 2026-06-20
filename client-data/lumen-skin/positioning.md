@@ -1,4 +1,4 @@
-# Positioning — Lumen Skin Studio
+# Positioning: Lumen Skin Studio
 
 **What we are:** A small-batch skincare studio for people who want real results
 without a 10-step routine.

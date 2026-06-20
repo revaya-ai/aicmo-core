@@ -1,4 +1,4 @@
-# Guardrails — Lumen Skin Studio
+# Guardrails: Lumen Skin Studio
 
 Hard rules for every piece of content. The Brand QC station checks against these.
 

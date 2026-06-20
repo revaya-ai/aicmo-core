@@ -1,4 +1,4 @@
-# Content Strategy — Lumen Skin Studio
+# Content Strategy: Lumen Skin Studio
 
 ## Goal
 Grow an audience that trusts us, then convert them to the three-product starter
@@ -10,10 +10,10 @@ set. Sell less complexity, not more products.
 - **LinkedIn:** founder build-in-public (optional, lower priority).
 
 ## Content pillars
-1. **Education (40%)** — teach the simple truth about skin. Debunk hype.
-2. **Proof (25%)** — before/afters, ingredient breakdowns, refund stories.
-3. **Behind the studio (20%)** — the two founders, small-batch making, honesty.
-4. **Offers (15%)** — the starter set, the guarantee, restocks.
+1. **Education (40%)**. Teach the simple truth about skin. Debunk hype.
+2. **Proof (25%)**. Before/afters, ingredient breakdowns, refund stories.
+3. **Behind the studio (20%)**. The two founders, small-batch making, honesty.
+4. **Offers (15%)**. The starter set, the guarantee, restocks.
 
 ## Cadence
 4 posts per week. One per pillar most weeks. Never two offer posts back to back.
