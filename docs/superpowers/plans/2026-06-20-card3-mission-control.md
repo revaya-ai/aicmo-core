@@ -427,23 +427,29 @@ def test_loser_stays_analyzed(fresh_db):
     assert db.get_post(post_id)["status"] == Status.ANALYZED
 
 
-def test_typical_generated_posts_fire(fresh_db):
-    # Calibration guard: with the real analytics generator (2-6% engagement),
-    # the MAJORITY of realistic posts must clear WINNER_THRESHOLD, or the ad
-    # path never fires in a live demo. Statistical (post ids are random uuids),
-    # so assert majority rather than every single post.
+def test_typical_generated_post_clears_threshold(fresh_db):
+    # Calibration guard: with the REAL analytics generator (2-6% engagement),
+    # a typical post must clear WINNER_THRESHOLD, or the ad path never fires in
+    # a live demo. Post ids are random uuids, so assert on the MEDIAN score over
+    # a large sample (deterministic and non-flaky) rather than a pass/fail count
+    # on a small sample (which has ~34% flake at n=12).
+    import json
+    import statistics
     from engine.mission import analytics
 
-    fired = 0
-    total = 12
-    for i in range(total):
+    scores = []
+    for i in range(50):
         post_id = db.create_post("lumen-skin", f"seed-{i}")
         db.advance(post_id, Status.PUBLISHED)
-        analytics.run(post_id)          # real generated metrics
-        ads_agent.run(post_id)
-        if db.get_post(post_id)["status"] == Status.AD_RECOMMENDED:
-            fired += 1
-    assert fired > total / 2, f"only {fired}/{total} typical posts fired"
+        analytics.run(post_id)  # real generated metrics
+        metrics = json.loads(db.get_post(post_id)["metrics_json"])
+        scores.append(ads_agent.winner_score(metrics))
+
+    median = statistics.median(scores)
+    assert median >= ads_agent.WINNER_THRESHOLD, (
+        f"median typical score {median} < threshold {ads_agent.WINNER_THRESHOLD}; "
+        "the ad path would rarely fire live"
+    )
 
 
 def test_demo_force_winner_env(fresh_db, monkeypatch):
