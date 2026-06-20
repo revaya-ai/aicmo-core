@@ -1,5 +1,7 @@
 data/*.db
 .env
+.venv/
+.superpowers/
 __pycache__/
 *.pyc
 renders/
