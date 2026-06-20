@@ -87,6 +87,15 @@ The human gate and the ad spend gate auto-approve in `run.py` (via
 Real builds will need the deps in `requirements.txt` and the keys in
 `.env.example` (copy it to `.env`). The stub loop needs neither.
 
+## Card 3 — Mission Control
+
+- `engine/mission/gate.py` — the human board (two gates): content Approve/Revise/Reject and ad spend Approve/Decline. Run: `.venv/bin/python engine/mission/gate.py` → http://localhost:5050
+- `engine/mission/driver.py` — `drive(post_id)` runs schedule → publish → analytics → ads after approval; shared by the board and `run.py`.
+- `engine/mission/{schedule,publish,analytics}.py` — demo-safe smart stubs (no API keys).
+- `engine/ads/ads_agent.py` — winner score + Claude rationale (templated fallback) + stub ad pusher behind the spend gate.
+
+Tests: `.venv/bin/python -m pytest tests/mission/ -v`
+
 ## Layout
 
 ```
