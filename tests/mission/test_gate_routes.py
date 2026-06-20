@@ -1,5 +1,3 @@
-import json
-
 import db
 from db import Status
 from engine.mission import gate
@@ -46,3 +44,20 @@ def test_reject_still_bounces(fresh_db, monkeypatch):
     db.advance(post_id, Status.QC_REVIEW)
     client.post(f"/decide/{post_id}", data={"decision": "needs_revision"})
     assert db.get_post(post_id)["status"] == Status.NEEDS_REVISION
+
+
+def test_declined_spend_drops_off_board(fresh_db, monkeypatch):
+    client = _client(monkeypatch)
+    post_id = db.create_post("lumen-skin", "seed")
+    db.advance(
+        post_id,
+        Status.AD_RECOMMENDED,
+        hook="declined hook",
+        ad_budget=50.0,
+        ad_audience="aud",
+        ad_status="recommended",
+    )
+    client.post(f"/spend/{post_id}", data={"decision": "decline"})
+    assert db.get_post(post_id)["ad_status"] == "declined"
+    # Declined card must not re-render in the Spend approvals section.
+    assert "declined hook" not in client.get("/").get_data(as_text=True)

@@ -200,6 +200,8 @@ def create_app():
         spend_rows = db.list_by_status(Status.AD_RECOMMENDED)
         spend_built = []
         for p in spend_rows:
+            if p.get("ad_status") == "declined":
+                continue  # human declined the spend; drop it off the board
             spend_built.append(
                 SPEND_CARD.format(
                     hook=_esc(p.get("hook") or ""),
