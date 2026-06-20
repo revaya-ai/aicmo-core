@@ -69,7 +69,10 @@ shape: `likes, comments, shares, follows, impressions`. Advance to `analyzed`.
 **`ads_agent.py`**
 1. **Winner score** — real formula: engagement rate
    `(likes+comments+shares)/impressions` plus follows-per-impression, combined
-   into a 0–100 score vs a threshold. Replaces the naive `follows > 10`.
+   into a 0–100 score vs a threshold (`WINNER_THRESHOLD = 30`, calibrated so the
+   majority of generator-produced posts clear it). Replaces the naive
+   `follows > 10`. A demo override (`DEMO_FORCE_WINNER=1` env var, or the magic
+   word `demowin` in the seed idea) guarantees the ad path fires on stage.
 2. **Recommendation** — propose budget + audience; a short Claude call writes the
    "why this won / who to target / suggested spend" rationale shown on the spend
    gate. Templated fallback when no API key.
