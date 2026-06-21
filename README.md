@@ -9,6 +9,14 @@ Station 1 (the Brain) and the Notion database, both built by our team** (see
 "What our team built" below). The remaining stations are still stubs that return
 canned data, swapped for real logic without ever touching the contract.
 
+> **The full system is bigger than this loop.** This repo is the engine. For the
+> whole platform across all six sections (onboarding/VPS, content engine, render,
+> orchestrator/distribution, analytics/SEO/GEO, client dashboard), with the build
+> status of every component, see [`docs/BUILD-TARGET.md`](docs/BUILD-TARGET.md).
+> For every environment variable the full system needs, see
+> [`.env.example`](.env.example). For the named-tool audit, see
+> [`docs/qa/reference-architecture.md`](docs/qa/reference-architecture.md).
+
 ## Who this is for (ICP)
 A small business with a marketing team of one, or a founder who can't afford a
 marketing team at all. The AI CMO runs the content department for them: ideates,
@@ -25,7 +33,7 @@ Demo client: **Lumen Skin Studio**, a small-batch skincare brand
 Our team owns two pieces. Both are real (not stubs), verified, and pushed. This
 section is what we present.
 
-### 1. The Brain (Station 1) — idea to on-brand draft
+### 1. The Brain (Station 1), idea to on-brand draft
 
 **What it is:** the "Think + Write" station. It turns a typed seed idea into an
 on-brand drafted post, grounded in the client's own brand files, using the Brick
@@ -62,12 +70,12 @@ the one human decision happens, Approve or Reject, from a phone. SQLite stays th
 engine's source of truth; Notion is the human surface, with a read-back that
 turns the client's tap into a pipeline advance.
 
-- `engine/dashboard/notion_provision.py` — creates the Content Pipeline database
+- `engine/dashboard/notion_provision.py`, creates the Content Pipeline database
   (the columns from Jen's board) in your Notion page.
-- `engine/dashboard/notion_sync.py` — `push` (pipeline → board) and `pull` (the
+- `engine/dashboard/notion_sync.py`, `push` (pipeline → board) and `pull` (the
   client's Approve/Reject → advances SQLite).
-- `engine/dashboard/notion_schema.py` — property schema + status maps.
-  `notion_client.py` — the API wrapper (stdlib, no extra install).
+- `engine/dashboard/notion_schema.py`, property schema + status maps.
+  `notion_client.py`, the API wrapper (stdlib, no extra install).
 
 Run it (offline stub, no Notion account needed):
 
@@ -95,7 +103,7 @@ pipeline. The database was never the product. The engine was.
 ## The contract-first rule
 `db.py` is the **frozen contract**. It defines the `posts` table, the `Status`
 constants, and the helper functions every station uses. Changing it requires
-**all three builders to agree** — a schema change breaks everyone at once.
+**all three builders to agree**, a schema change breaks everyone at once.
 Everything else (the station internals) is yours to rewrite freely.
 
 ## The status pipeline
@@ -166,7 +174,7 @@ Real builds will need the deps in `requirements.txt` and the keys in
 
 ```
 db.py            # FROZEN CONTRACT (schema + helpers)
-run.py           # orchestrator — walks one idea through every station
+run.py           # orchestrator, walks one idea through every station
 client-data/     # 6-layer context per client (lumen-skin demo)
 templates/       # social post template (Station 2 screenshots this)
 engine/          # the 4 stations

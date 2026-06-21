@@ -52,8 +52,8 @@ or code at all).
 | Claude vision (brand QC) | Score the rendered image 0 to 100 against the brand spec and gate. | Docs name `AICMO_VISION_QC=claude`, but that string appears in no code. | `engine/studio/brand_qc.py` hardcodes a passing score and notes the vision QC is not run. TODO(builder) placeholder. | STUB-ONLY |
 | Playwright | Screenshot the filled HTML template to a 1080x1350 PNG. | Docs name `AICMO_RENDER=playwright`, but that string appears in no code. | `engine/studio/render.py` sets the image path but produces no file. TODO(builder) placeholder. Playwright is in `requirements.txt` as a real-build-only dependency. | STUB-ONLY |
 | Zernio | Publish the post and pull engagement analytics. | Docs name `ZERNIO_API_KEY`, but no code reads it; the `engine/mission/zernio.py` wrapper named in the plan does not exist. | `engine/mission/publish.py` writes a fake post URL; `engine/mission/analytics.py` writes hardcoded mock metrics. Both carry TODO(builder). | STUB-ONLY |
-| Meta Ads | Push an approved ad to a live campaign. | Doc-vs-code mismatch: README names `META_ACCESS_TOKEN`, `.env.example` names `META_ADS_TOKEN`, and the code reads NEITHER (no env gate exists yet). The builder must add the gate and pick one canonical name. | `engine/ads/ads_agent.py` hardcodes a fake campaign id. TODO(builder). No `ads_push.py` module yet. | STUB-ONLY |
-| LinkedIn Ads | Alternate ad platform push. | Doc-vs-code mismatch: README names `LINKEDIN_ACCESS_TOKEN`, `.env.example` names `LINKEDIN_ADS_TOKEN`, and the code reads NEITHER. Builder must add the gate and pick one canonical name. | Same inline fake-campaign stub as Meta in `engine/ads/ads_agent.py`. No distinct LinkedIn code path. | STUB-ONLY |
+| Meta Ads | Push an approved ad to a live campaign. | Canonical `META_ACCESS_TOKEN` (README and `.env.example` agree). Code reads no env var yet; the builder adds the gate when wiring the real push. | `engine/ads/ads_agent.py` hardcodes a fake campaign id. TODO(builder). No `ads_push.py` module yet. | STUB-ONLY |
+| LinkedIn Ads | Alternate ad platform push. | Canonical `LINKEDIN_ACCESS_TOKEN` (README and `.env.example` agree). Code reads no env var yet; the builder adds the gate when wiring the real push. | Same inline fake-campaign stub as Meta in `engine/ads/ads_agent.py`. No distinct LinkedIn code path. | STUB-ONLY |
 | GSC (Google Search Console) | Intelligence-layer search-console signals. | Named in docs only. No env read, no client module. | No code at all. Pure documentation intent. | NOT BUILT |
 | Apify | Intelligence-layer competitor scrapes. | `APIFY_TOKEN` named in docs only. No env read, no client module. | No code at all. Pure documentation intent. | NOT BUILT |
 
@@ -63,8 +63,8 @@ These are not bugs in the loop (the loop runs offline regardless), but they will
 silently waste a builder's time, because setting the documented key activates
 nothing.
 
-1. Meta Ads: README says `META_ACCESS_TOKEN`, `.env.example` says `META_ADS_TOKEN`, code reads neither. Pick one name, add the env gate, align both docs.
-2. LinkedIn Ads: README says `LINKEDIN_ACCESS_TOKEN`, `.env.example` says `LINKEDIN_ADS_TOKEN`, code reads neither. Same fix.
+1. Meta Ads: `.env.example` and README now agree on the canonical `META_ACCESS_TOKEN`, but the code still reads no env var. The builder adds the gate when wiring the real campaign push.
+2. LinkedIn Ads: `.env.example` and README now agree on `LINKEDIN_ACCESS_TOKEN`, but the code still reads no env var. Same: add the gate when wiring the real push.
 3. Anthropic: `.env.example` declares `ANTHROPIC_API_KEY`, but no Python reads it (generation lives in a Claude Code command). Either wire a Python seam or note in the docs that the key is for the command, not the engine.
 4. Render and vision QC: README documents `AICMO_RENDER=playwright` and `AICMO_VISION_QC=claude` as the go-real switches, but neither string exists in code. The stations are unconditional stubs. Add the env check when wiring the real path.
 5. Zernio: `ZERNIO_API_KEY` is documented in two places, but no code reads it and the `zernio.py` wrapper does not exist.
