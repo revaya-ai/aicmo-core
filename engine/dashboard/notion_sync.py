@@ -82,8 +82,10 @@ def _apply_decision(post_id, label, comment, applied):
         db.advance(post_id, db.Status.APPROVED)
         applied.append((post_id, "approved"))
     elif label in notion_schema.SEND_BACK_LABELS:
-        feedback.send_back_to_brain(post_id, comment)   # -> captured, comment saved
-        applied.append((post_id, "sent_back_to_brain"))
+        # Reject / needs-revision: store the comment AND re-draft back to qc_review,
+        # so the revised post lands in front of the human again (not stalled).
+        feedback.reject_and_redraft(post_id, comment)
+        applied.append((post_id, "rejected_and_redrafted"))
 
 
 def pull_gate(client: str) -> list:
@@ -98,6 +100,8 @@ def pull_gate(client: str) -> list:
             comment = _plain(pr.get("Client Comment"))
             if post_id:
                 _apply_decision(post_id, label, comment, applied)
+        if applied:
+            push(client)  # reflect new states (rejected -> re-drafted In Review)
         return applied
 
     path = _board_path(client)
@@ -108,6 +112,8 @@ def pull_gate(client: str) -> list:
     for card in board.get("cards", []):
         _apply_decision(card.get("post_id"), card.get("status_label"),
                         card.get("client_comment"), applied)
+    if applied:
+        push(client)  # reflect new states (rejected -> re-drafted In Review)
     return applied
 
 
