@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.aicmo.engagement</string>
+
+    <!-- Run nightly at 19:30 -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>19</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+
+    <key>ProgramArguments</key>
+    <array>
+        <!-- Replace with: $(python3 -c "import sys; print(sys.executable)") from the repo root -->
+        <string>/opt/homebrew/bin/python3</string>
+        <string>-m</string>
+        <string>engine.cron</string>
+        <string>engagement</string>
+        <string>--client</string>
+        <string>lumen-skin</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/short/Downloads/aicmo-core</string>
+
+    <key>StandardOutPath</key>
+    <string>/Users/short/Downloads/aicmo-core/outputs/logs/engagement.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/short/Downloads/aicmo-core/outputs/logs/engagement.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>KeepAlive</key>
+    <false/>
+</dict>
+</plist>

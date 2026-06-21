@@ -10,6 +10,7 @@ __pycache__/
 *.pyc
 renders/
 .DS_Store
+outputs/logs/
 
 # SDD controller scratch (briefs, reports, review packages)
 .superpowers/
