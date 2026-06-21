@@ -30,8 +30,16 @@ def _client_rows(client: str, status: str) -> list:
 
 
 def sweep(client: str) -> int:
-    """Walk every captured row to qc_review. Never sets approved."""
-    rows = _client_rows(client, Status.CAPTURED)
+    """Walk every captured row to qc_review. Never sets approved.
+
+    Posts whose qc_notes contains ``DEVELOP_STAGE:`` are skipped — they are
+    under operator co-pilot control via ``engine.develop`` and must not be
+    processed by the automated sweep.
+    """
+    rows = [
+        p for p in _client_rows(client, Status.CAPTURED)
+        if "DEVELOP_STAGE:" not in (p.get("qc_notes") or "")
+    ]
     for post in rows:
         pid = post["id"]
 
