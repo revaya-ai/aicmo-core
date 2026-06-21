@@ -13,11 +13,13 @@ stub that runs by default and only calls the real service when the matching env
 var is set. So a fresh clone walks a seed idea from `captured` all the way to
 `ad_live` with one command and no setup.
 
-This repo is the engine. The Brain (Station 1) and the Notion client are real;
-the other stations run as stubs today and swap in real logic without ever
-touching the contract. The full platform across all six sections, with the build
-status of every component, is mapped in
-[`docs/BUILD-TARGET.md`](docs/BUILD-TARGET.md).
+This repo is the engine. The Notion client is wired (credential-gated, with an
+offline fallback), and the Brain's Brick chain is built but runs as a
+deterministic offline stand-in. Real unattended generation is still an open gap.
+The other stations run as stubs today and swap in real logic without ever
+touching the contract. The whole product, how it runs (cron, agents, Notion), the
+build status of every component, and the open gaps, is in
+[`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Who this is for (ICP)
 A small business with a marketing team of one, or a founder who can't afford a
@@ -72,7 +74,7 @@ Off-ramps: `needs_revision` and `rejected` (set at the human gate or by QC).
 
 The one human decision lives between render and publish: `mission.gate`. For which
 stations are real, stubbed, or not built, see
-[`docs/BUILD-TARGET.md`](docs/BUILD-TARGET.md).
+[`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## How to run the loop
 
@@ -108,7 +110,7 @@ The four-station loop is the spine. The complete platform adds onboarding and VP
 setup, the front-of-funnel intelligence and AEO layer, the render and Placid
 backends, distribution scheduling, and the analytics, SEO, GEO, and client
 dashboard layer. All of it, section by section with the build status of every
-component, is in [`docs/BUILD-TARGET.md`](docs/BUILD-TARGET.md). The reference
+component, is in [`ARCHITECTURE.md`](ARCHITECTURE.md). The reference
 implementation for the parts not yet built here lives in the sibling repo
 `aicmo-complete`.
 
@@ -142,6 +144,7 @@ Tests: `.venv/bin/python -m pytest tests/mission/ -v`
 ## Layout
 
 ```
+ARCHITECTURE.md  # the whole product: runtime, full component map, open gaps
 db.py            # FROZEN CONTRACT (schema + helpers)
 run.py           # orchestrator, walks one idea through every station
 client-data/     # 6-layer context per client (lumen-skin demo)
@@ -149,7 +152,7 @@ templates/       # social post template (Station 2 renders this)
 engine/          # the 4 stations + the Notion dashboard client
 .claude/skills/  # the craft: content-os, positioning-angles, writing-style, hook-library, story-structures
 .claude/commands/ # the Brain: ai-cmo-generate
-docs/            # BUILD-TARGET.md (full map), qa/ (audit), notion-setup.md, superpowers/ (plans + specs)
+docs/            # qa/ (audit), notion-setup.md, superpowers/ (plans + specs)
 data/            # aicmo.db created here (gitignored)
 outputs/         # notion-mirror.json (stub board, gitignored)
 ```
