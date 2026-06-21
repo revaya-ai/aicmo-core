@@ -1,75 +1,144 @@
-"""STATION 4 — Ads (recommend-only): turn a winning post into a paid ad.
+"""STATION 4 — Ads (recommend-only): winning post -> paid ad proposal.
 
 Reads:  status == analyzed   (uses metrics_json)
-Writes: status == ad_recommended   if the post is a winner
-            (sets ad_target_post_id, ad_budget, ad_audience, ad_status)
-        then, after a HUMAN spend gate:
-        status == ad_approved        (sets ad_spend_approved_by)
-        status == ad_live            (ad pushed to the ad platform)
+Writes: status == ad_recommended (winner) with budget/audience/rationale.
+        Then, after a HUMAN spend gate (Task 6): ad_approved -> ad_live.
 
-If the post is NOT a winner, this station does nothing and leaves it at
-analyzed (the loop ends there).
-
-Signature: run(post_id: str, auto_approve: bool = False) -> None
-
-This station NEVER spends money on its own. It recommends. A human approves the
-spend. For the demo, auto_approve=True approves the spend automatically.
-
-The real version reads engagement, decides if it beats a winner threshold,
-proposes budget + audience, then (after human approval) creates the campaign on
-Meta / LinkedIn Ads. The stub recommends only if mock follows > FOLLOW_THRESHOLD,
-auto-approves spend in run.py, and fakes ad_live.
+Never spends on its own. Claude writes the rationale when a key is present;
+otherwise a templated rationale is used. The ad-platform push is a demo-safe
+stub. signature: run(post_id, auto_approve=False) -> None
 """
 
 import json
+import os
 
 from db import Status, get_post, advance, update_post
 
-FOLLOW_THRESHOLD = 10
+# Calibrated against the analytics generator (2-6% engagement -> scores ~16-57,
+# median ~35). 30 fires ~60% of typical posts; the genuine-loser test scores
+# ~0.4 and stays correctly below it. Do NOT raise this without re-checking the
+# distribution, or the ad path stops firing in live demos.
+WINNER_THRESHOLD = 30.0       # 0-100 winner_score cutoff
+ADS_MODEL = "claude-sonnet-4-6"
+DEFAULT_AUDIENCE = "Women 25-45, skincare-curious, US/CA"
+
+
+def _force_winner(post: dict) -> bool:
+    """Demo override: guarantee the ad path fires on stage regardless of metrics.
+
+    Triggered by DEMO_FORCE_WINNER=1 or the magic word 'demowin' in the seed.
+    """
+    if os.environ.get("DEMO_FORCE_WINNER") == "1":
+        return True
+    return "demowin" in (post.get("seed_idea") or "").lower()
+
+
+def winner_score(metrics: dict) -> float:
+    """0-100 score from engagement rate and follows-per-impression."""
+    impressions = max(1, metrics.get("impressions", 0))
+    engagement = (
+        metrics.get("likes", 0)
+        + metrics.get("comments", 0)
+        + metrics.get("shares", 0)
+    )
+    eng_rate = engagement / impressions           # ~0.00-0.15
+    follow_rate = metrics.get("follows", 0) / impressions
+    # Weight engagement 70%, follow-rate 30%; normalize to 0-100.
+    raw = (eng_rate * 0.7 + follow_rate * 0.3) * 1000
+    return round(min(100.0, raw), 1)
+
+
+def _budget_for(score: float) -> float:
+    """Bigger winners get a bigger proposed daily budget."""
+    if score >= 80:
+        return 150.0
+    if score >= 70:
+        return 100.0
+    return 50.0
+
+
+def _template_rationale(post, metrics, score, budget, audience) -> str:
+    return (
+        f"Winner score {score}/100 (engagement rate "
+        f"{(metrics.get('likes',0)+metrics.get('comments',0)+metrics.get('shares',0))/max(1,metrics.get('impressions',1)):.1%}, "
+        f"{metrics.get('follows',0)} new follows). "
+        f"Recommend ${budget:.0f}/day targeting {audience}. "
+        f"This post out-performed baseline, so paid amplification should extend reach efficiently."
+    )
+
+
+def build_rationale(post, metrics, score, budget, audience) -> str:
+    """Claude-authored rationale; templated fallback. Never raises."""
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return _template_rationale(post, metrics, score, budget, audience)
+    try:
+        import anthropic
+
+        client = anthropic.Anthropic()
+        prompt = (
+            "You are an ads strategist for a skincare brand. In 2-3 sentences, "
+            "explain why this post is worth promoting and who to target. Be concrete.\n\n"
+            f"Hook: {post.get('hook')}\n"
+            f"Metrics: {json.dumps(metrics)}\n"
+            f"Winner score: {score}/100\n"
+            f"Proposed budget: ${budget:.0f}/day; audience: {audience}\n"
+        )
+        msg = client.messages.create(
+            model=ADS_MODEL,
+            max_tokens=200,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
+        return text.strip() or _template_rationale(post, metrics, score, budget, audience)
+    except Exception as exc:  # demo-safe: never let ads break the loop
+        print(f"    [ads] Claude rationale unavailable ({exc}); using template.")
+        return _template_rationale(post, metrics, score, budget, audience)
 
 
 def run(post_id: str, auto_approve: bool = False) -> None:
     post = get_post(post_id)
     metrics = json.loads(post.get("metrics_json") or "{}")
-    follows = metrics.get("follows", 0)
+    score = winner_score(metrics)
+    forced = _force_winner(post)
 
-    # --- Decide: is this a winner worth promoting? -----------------------
-    # TODO(builder): replace the single-metric check with a real winner score
-    # (engagement rate, follows-per-impression, topic fit, etc).
-    if follows <= FOLLOW_THRESHOLD:
-        print(
-            f"    [ads] follows={follows} <= {FOLLOW_THRESHOLD}: not a winner, "
-            "no ad recommended."
-        )
+    if not forced and score < WINNER_THRESHOLD:
+        print(f"    [ads] score {score} < {WINNER_THRESHOLD}: not a winner.")
         return
+    if forced:
+        print(f"    [ads] DEMO override: forcing winner (score was {score}).")
 
-    # --- Recommend (no spend yet) ----------------------------------------
-    # TODO(builder): derive budget + audience from the brand + performance.
+    budget = _budget_for(score)
+    audience = DEFAULT_AUDIENCE
+    rationale = build_rationale(post, metrics, score, budget, audience)
+
     advance(
         post_id,
         Status.AD_RECOMMENDED,
         ad_target_post_id=post_id,
-        ad_budget=50.0,
-        ad_audience="Women 25-45, skincare-curious, US/CA",
+        ad_budget=budget,
+        ad_audience=audience,
         ad_status="recommended",
+        human_note=rationale,
     )
-    print(
-        f"    [ads] follows={follows} > {FOLLOW_THRESHOLD}: recommended "
-        "$50/audience women 25-45."
-    )
+    print(f"    [ads] score {score}: recommended ${budget:.0f}/day -> {audience}")
 
-    # --- HUMAN spend gate ------------------------------------------------
     if not auto_approve:
-        # TODO(builder): in production, stop here and wait for a human to
-        # approve the spend (e.g. via the Flask gate). Do not spend money.
         print("    [ads] awaiting human spend approval. Stopping at ad_recommended.")
         return
 
-    advance(post_id, Status.AD_APPROVED, ad_spend_approved_by="AUTO (demo loop)")
+    approve_spend(post_id, approved_by="AUTO (demo loop)")
 
-    # --- Go live ---------------------------------------------------------
-    # TODO(builder): create the real campaign via Meta/LinkedIn Ads API and
-    # store the campaign id in ad_status.
-    update_post(post_id, ad_status="live:fake-campaign-123")
+
+def _campaign_id(post_id: str) -> str:
+    # Demo-safe stub id. Swap for a real Meta/LinkedIn campaign id later.
+    return f"fake-campaign-{post_id[:8]}"
+
+
+def approve_spend(post_id: str, approved_by: str) -> None:
+    """Human (or auto demo) approved the spend: go live via the stub pusher."""
+    advance(post_id, Status.AD_APPROVED, ad_spend_approved_by=approved_by)
+    campaign = _campaign_id(post_id)
+    # TODO(stretch): create the real campaign via Meta/LinkedIn Ads API here.
+    update_post(post_id, ad_status=f"live:{campaign}")
     advance(post_id, Status.AD_LIVE)
-    print("    [ads] STUB campaign live: fake-campaign-123")
+    print(f"    [ads] STUB campaign live: {campaign} (approved by {approved_by})")
