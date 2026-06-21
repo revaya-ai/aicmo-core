@@ -9,6 +9,7 @@ The real version pushes the post + image to Zernio (or the platform API) and
 records the live URL. The stub logs and sets a fake published_url.
 """
 
+import engine.env  # noqa: F401
 from db import Status, get_post, advance
 
 

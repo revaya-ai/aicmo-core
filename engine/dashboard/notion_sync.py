@@ -20,6 +20,7 @@ sys.path.insert(
     0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 
+import engine.env  # noqa: F401, E402
 import db  # noqa: E402
 from engine import feedback  # noqa: E402
 from engine.dashboard import (  # noqa: E402

@@ -11,6 +11,7 @@ stations with the Python standard library only.
 
 import sys
 
+import engine.env  # noqa: F401
 import db
 from db import get_post
 
