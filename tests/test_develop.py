@@ -241,3 +241,58 @@ def test_sweep_processes_normal_alongside_in_develop(isolated):
     assert n == 1, "only the normal post should be swept"
     assert db.get_post(pid_normal)["status"] == db.Status.QC_REVIEW
     assert db.get_post(pid_develop)["status"] == db.Status.CAPTURED
+
+
+# ---------------------------------------------------------------------------
+# Test 8: lock-contract — confirm_positioning builds from stored angle, not
+#          a fresh chain run.
+# ---------------------------------------------------------------------------
+
+def test_lock_contract_confirm_positioning_uses_stored_angle(isolated, tmp_path):
+    """The lock contract: after start(), overwriting the DB angle with a sentinel
+    value must cause confirm_positioning to build hook+body FROM that sentinel,
+    not from a freshly regenerated positioning angle.
+
+    This proves that confirm_positioning reads the stored angle (the one the
+    operator confirmed) rather than re-running run_chain which could produce a
+    different angle on a live API key.
+    """
+    out_dir = str(tmp_path / "out")
+    client = "lumen-skin"
+    pid = db.create_post(client, "an important idea")
+
+    # Stage 0+1: run start — stores the real offline angle
+    develop.start(pid)
+
+    post_after_start = db.get_post(pid)
+    assert post_after_start.get("angle"), "start() must write an angle"
+
+    # Overwrite the stored angle with a sentinel value that can never be
+    # produced by run_chain (it would require fabricating this exact string).
+    db.update_post(pid, angle="LOCKED-SENTINEL")
+
+    # Confirm that the sentinel is stored
+    assert db.get_post(pid)["angle"] == "LOCKED-SENTINEL"
+
+    # Operator signals confirm
+    _set_develop_confirm(out_dir, client, pid, "positioning")
+
+    # Run confirm_positioning — must build from the sentinel, not re-run the chain
+    develop.confirm_positioning(pid)
+
+    post_after_confirm = db.get_post(pid)
+
+    # The angle field must still be the sentinel — confirm_positioning must NOT
+    # have overwritten it with a freshly generated angle.
+    assert post_after_confirm["angle"] == "LOCKED-SENTINEL", (
+        "confirm_positioning must NOT overwrite the locked angle with a fresh chain run"
+    )
+
+    # hook and body must have been produced (offline path is deterministic)
+    assert post_after_confirm.get("hook"), "hook must be written after positioning confirmed"
+    assert post_after_confirm.get("body"), "body must be written after positioning confirmed"
+
+    # Stage must advance to caption
+    assert "DEVELOP_STAGE:caption" in (post_after_confirm.get("qc_notes") or ""), (
+        "stage must advance to DEVELOP_STAGE:caption"
+    )
