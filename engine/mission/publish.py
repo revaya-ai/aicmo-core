@@ -38,10 +38,11 @@ def _zernio_configured() -> bool:
 
 
 def _publish_url(post_id: str, platform: str) -> str:
-    """Return a published URL. Real Zernio when key present, fake stub otherwise."""
+    """Return a published URL. Offline stub only — Zernio not wired; unset ZERNIO_API_KEY to use offline stub."""
     if _zernio_configured():
-        # Real Zernio push would happen here; for now fall through to stub.
-        pass
+        raise NotImplementedError(
+            "Zernio integration is not wired yet. Unset ZERNIO_API_KEY to use the offline fallback."
+        )
     base = PLATFORM_BASE.get(platform, DEFAULT_BASE)
     slug = f"lumen-skin-{post_id[:8]}"
     return f"{base}/{slug}"

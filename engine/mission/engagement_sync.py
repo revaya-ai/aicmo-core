@@ -33,10 +33,11 @@ def _zernio_configured() -> bool:
 
 
 def _fetch_metrics(post_id: str, published_url: str) -> dict:
-    """Pull engagement for a post. Real Zernio when key present, mock fallback otherwise."""
+    """Pull engagement for a post. Offline mock only — Zernio not wired; set no key to use offline fallback."""
     if _zernio_configured():
-        # Real Zernio pull would happen here. Stub falls through.
-        pass
+        raise NotImplementedError(
+            "Zernio integration is not wired yet. Unset ZERNIO_API_KEY to use the offline fallback."
+        )
     # Offline fallback: use the deterministic mock from analytics
     return _mock_metrics(post_id)
 

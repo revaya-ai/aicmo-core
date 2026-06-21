@@ -129,6 +129,25 @@ def test_engagement_sync_also_covers_analyzed_posts(offline_tmp, monkeypatch):
     assert pushed["count"] >= 1
 
 
+# ---------------------------------------------------------------------------
+# NotImplementedError when ZERNIO_API_KEY is set (online branch guard)
+# ---------------------------------------------------------------------------
+
+
+def test_publish_url_raises_when_zernio_key_set(offline_tmp, monkeypatch):
+    """_publish_url must raise NotImplementedError when ZERNIO_API_KEY is set (not wired)."""
+    monkeypatch.setenv("ZERNIO_API_KEY", "x")
+    with pytest.raises(NotImplementedError, match="Zernio integration is not wired yet"):
+        publish._publish_url("post-id-1", "linkedin")
+
+
+def test_fetch_metrics_raises_when_zernio_key_set(offline_tmp, monkeypatch):
+    """_fetch_metrics must raise NotImplementedError when ZERNIO_API_KEY is set (not wired)."""
+    monkeypatch.setenv("ZERNIO_API_KEY", "x")
+    with pytest.raises(NotImplementedError, match="Zernio integration is not wired yet"):
+        engagement_sync._fetch_metrics("post-id-1", "https://social.test/p/1")
+
+
 def test_engagement_sync_does_not_set_approved(offline_tmp, monkeypatch):
     """HARD CONSTRAINT: engagement_sync must never set status to approved."""
     monkeypatch.setattr(db, "DB_PATH", str(offline_tmp / "t.db"))
