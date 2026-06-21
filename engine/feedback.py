@@ -27,7 +27,7 @@ def reprocess_to_review(post_id: str) -> None:
     rejected card stalls at 'captured' and never re-drafts. Imports are local to
     avoid a circular import at module load.
     """
-    from engine.brain import generate as brain
+    from engine.brain import ai_cmo_generate as brain
     from engine.studio import brand_qc, render
 
     brain.run(post_id)      # captured -> drafted (folds human_note feedback in)
