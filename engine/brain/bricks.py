@@ -11,8 +11,11 @@ Phase order: voc -> intake -> topic -> angle -> hook -> story
 (voc is handled by ai_cmo_generate.run_chain before entering the loop)
 """
 
+import logging
 import os
 import json
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Offline fallback artifacts by phase (used when Claude call fails).
@@ -23,6 +26,41 @@ _OFFLINE: dict = {
     "angle":   "Simpler routines win. Most brands overcomplicate it.",
     "hook":    "The routine problem is not the ingredients.",
     "story":   "Pick three things. Do them every day. Give it four weeks. Simple beats fancy.",
+}
+
+# Per-phase max_tokens caps.  story needs headroom for 100-150 word body.
+_MAX_TOKENS: dict = {
+    "intake": 512,
+    "topic":  512,
+    "angle":  512,
+    "hook":   512,
+    "story":  768,
+}
+
+# Phase instructions (module-level constant — not rebuilt on every call).
+_PHASE_INSTRUCTIONS: dict = {
+    "intake": (
+        "You are the Intake brick. Your job: confirm and restate the seed idea "
+        "as a single crisp sentence that the downstream bricks will work from. "
+        "Return only the intake sentence."
+    ),
+    "topic": (
+        "You are the Topic brick. Pick the single best content pillar for this post "
+        "from the strategy.md pillars. Return only the pillar name, nothing else."
+    ),
+    "angle": (
+        "You are the Angle brick. Write a single sentence angle (the fresh take / "
+        "contrarian claim) for this post. Match the client voice. Return only the angle."
+    ),
+    "hook": (
+        "You are the Hook brick. Write a single punchy opening hook line (max 12 words) "
+        "that stops the scroll. Return only the hook."
+    ),
+    "story": (
+        "You are the Story brick. Write the full post body (100-150 words). "
+        "Match the voice profile. Use the locked angle and hook. "
+        "Return only the body text."
+    ),
 }
 
 
@@ -97,45 +135,29 @@ def run_phase(phase: str, ctx: list, seed: str, artifacts: dict) -> str:
             f"{k}: {v}" for k, v in artifacts.items() if k != "voc"
         )
 
-        phase_instructions = {
-            "intake": (
-                "You are the Intake brick. Your job: confirm and restate the seed idea "
-                "as a single crisp sentence that the downstream bricks will work from. "
-                f"Seed idea: {seed}\n\nReturn only the intake sentence."
-            ),
-            "topic": (
-                "You are the Topic brick. Pick the single best content pillar for this post "
-                "from the strategy.md pillars. Return only the pillar name, nothing else."
-            ),
-            "angle": (
-                "You are the Angle brick. Write a single sentence angle (the fresh take / "
-                "contrarian claim) for this post. Match the client voice. Return only the angle."
-            ),
-            "hook": (
-                "You are the Hook brick. Write a single punchy opening hook line (max 12 words) "
-                "that stops the scroll. Return only the hook."
-            ),
-            "story": (
-                "You are the Story brick. Write the full post body (100-150 words). "
-                "Match the voice profile. Use the locked angle and hook. "
-                "Return only the body text."
-            ),
-        }
-
-        instruction = phase_instructions.get(
+        base_instruction = _PHASE_INSTRUCTIONS.get(
             phase,
             f"You are the {phase} brick. Process the seed idea and return your output."
         )
+        # intake brick needs the seed embedded in the instruction
+        if phase == "intake":
+            base_instruction = (
+                "You are the Intake brick. Your job: confirm and restate the seed idea "
+                "as a single crisp sentence that the downstream bricks will work from. "
+                f"Seed idea: {seed}\n\nReturn only the intake sentence."
+            )
 
         prompt_text = (
-            f"{instruction}\n\n"
+            f"{base_instruction}\n\n"
             f"Prior locked artifacts:\n{prior_text}\n\n"
             f"Seed idea: {seed}"
         )
 
+        max_tokens = _MAX_TOKENS.get(phase, 512)
+
         response = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=512,
+            max_tokens=max_tokens,
             messages=[
                 {
                     "role": "user",
@@ -147,8 +169,14 @@ def run_phase(phase: str, ctx: list, seed: str, artifacts: dict) -> str:
         result = response.content[0].text.strip()
         return result if result else _OFFLINE.get(phase, f"{phase} output")
 
-    except Exception:
+    except Exception as exc:
         # Never crash the loop. Return deterministic offline artifact.
+        logger.warning(
+            "Phase '%s' fell back to offline artifact (exception: %s: %s)",
+            phase,
+            type(exc).__name__,
+            exc,
+        )
         return _OFFLINE.get(phase, f"{phase} offline fallback")
 
 
