@@ -1,0 +1,28 @@
+direction: down
+
+title: |md
+  # AI CMO — Organic-to-Paid Engine
+  ## Post organically → measure FOLLOWS → promote the top 2–3 as ads (Jamie's method)
+| {near: top-center; style.font-size: 22}
+
+legend: Legend {
+  near: top-right
+  grid-columns: 1
+  built: "Built — runs locally, no setup" {style.fill: "#d6f5d6"}
+  link: "NEEDS LINKING — agency owner connects this" {style.fill: "#ffe0b2"}
+  human: "HUMAN decision" {style.fill: "#e1d5f5"}
+}
+
+brand: "1 · Brand Context\nthe client's brand files (voice, audience, offers)\nSET UP ONCE per client via onboarding" {style.fill: "#d6f5d6"}
+brain: "2 · BRAIN — writes the post\nin the client's voice\n🔌 Claude API key" {style.fill: "#ffe0b2"}
+studio: "3 · STUDIO — makes the image + brand-checks it\n🔌 Claude API key (vision)  ·  optional: Placid" {style.fill: "#ffe0b2"}
+gate: "4 · HUMAN GATE ✋\napprove / revise / reject the post\n(runs locally — a web page)" {style.fill: "#e1d5f5"}
+publish: "5 · PUBLISH to Instagram\n🔌 Zernio + their Instagram account" {style.fill: "#ffe0b2"}
+measure: "6 · MEASURE — pull FOLLOWS back per post\n🔌 Zernio / Instagram analytics" {style.fill: "#ffe0b2"}
+winner: "7 · WINNER ENGINE — rank every post by FOLLOWS,\npick the TOP 2–3 (Jamie's rule, not views)\n(runs locally)" {style.fill: "#d6f5d6"}
+spend: "8 · HUMAN GATE ✋\napprove the ad spend (budget + audience)\n(runs locally)" {style.fill: "#e1d5f5"}
+ads: "9 · PAID ADS on the winners only\n🔌 Meta Ads account + payment" {style.fill: "#ffe0b2"}
+live: "10 · Ad live on Instagram\nbringing in more of the right followers" {style.fill: "#ffe0b2"}
+
+brand -> brain -> studio -> gate -> publish -> measure -> winner -> spend -> ads -> live
+live -> measure: "FEEDBACK LOOP — results inform the next round" {style.stroke-dash: 4; style.stroke: "#999"}
