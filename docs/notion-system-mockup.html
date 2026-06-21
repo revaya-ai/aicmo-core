@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI CMO — Notion System Design (mockup)</title>
+<style>
+  :root{
+    --ink:#37352f; --soft:#787774; --faint:#9b9a97;
+    --line:#e9e9e7; --line2:#ededec; --bg:#ffffff; --panel:#fbfbfa; --hover:#f1f1ef;
+    /* brand accents for annotations */
+    --navy:#0d1a4a; --purple:#553555; --teal:#028090; --coral:#F45B69; --light:#E4FDE1;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif;
+    color:var(--ink);background:#f6f6f5;line-height:1.5;padding:32px 24px 80px}
+  .wrap{max-width:1180px;margin:0 auto}
+  h1{font-size:26px;font-weight:800;letter-spacing:-.3px}
+  .sub{color:var(--soft);font-size:14px;margin-top:6px;max-width:760px}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin:18px 0 8px;font-size:12.5px}
+  .legend span{display:inline-flex;align-items:center;gap:7px;color:var(--soft)}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .built{background:var(--teal)} .seam{background:var(--purple)} .human{background:var(--coral)}
+
+  .section{background:var(--bg);border:1px solid var(--line);border-radius:12px;
+    margin-top:28px;overflow:hidden;box-shadow:0 1px 2px rgba(15,26,74,.04)}
+  .section > h2{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--teal);
+    font-weight:700;padding:16px 22px 0}
+  .section > .t{font-size:19px;font-weight:700;padding:2px 22px 0}
+  .section > .d{font-size:13.5px;color:var(--soft);padding:6px 22px 18px;max-width:820px}
+
+  /* notion-ish app frame */
+  .app{display:grid;grid-template-columns:230px 1fr;border-top:1px solid var(--line);min-height:420px}
+  .side{background:var(--panel);border-right:1px solid var(--line);padding:14px 10px;font-size:13.5px}
+  .side .ws{display:flex;align-items:center;gap:8px;font-weight:600;padding:6px 8px;border-radius:6px}
+  .side .av{width:20px;height:20px;border-radius:5px;background:var(--navy);color:#fff;
+    display:grid;place-items:center;font-size:11px;font-weight:700}
+  .side .guest{font-size:10.5px;color:#fff;background:var(--coral);border-radius:20px;padding:1px 8px;margin-left:auto}
+  .side .grp{color:var(--faint);font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin:16px 8px 4px}
+  .side .item{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:6px;color:var(--ink);cursor:default}
+  .side .item:hover{background:var(--hover)}
+  .side .item.active{background:var(--hover);font-weight:600}
+  .ic{width:17px;text-align:center;opacity:.8}
+
+  .main{padding:20px 26px}
+  .crumb{font-size:12.5px;color:var(--faint);margin-bottom:6px}
+  .pagetitle{font-size:24px;font-weight:800;display:flex;align-items:center;gap:10px}
+  .viewtabs{display:flex;gap:4px;margin:16px 0 14px;border-bottom:1px solid var(--line)}
+  .viewtabs div{font-size:13px;color:var(--soft);padding:7px 10px;border-bottom:2px solid transparent}
+  .viewtabs div.on{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
+
+  /* board */
+  .board{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+  .col h3{font-size:12px;font-weight:600;color:var(--soft);margin-bottom:9px;display:flex;justify-content:space-between}
+  .col h3 b{color:var(--faint);font-weight:600}
+  .card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:9px;
+    box-shadow:0 1px 1px rgba(0,0,0,.03)}
+  .card .ttl{font-size:12.5px;font-weight:600;line-height:1.35;margin-bottom:7px}
+  .pill{display:inline-block;font-size:10.5px;border-radius:20px;padding:1px 8px;margin:2px 3px 0 0}
+  .pill.pi{background:#eef3ff;color:#3b5bdb} .pill.qc{background:var(--light);color:#0b6b53}
+  .pill.warn{background:#fff3e6;color:#b5651d}
+  .thumb{height:46px;border-radius:5px;margin-top:8px;
+    background:linear-gradient(135deg,#0d1a4a,#553555);position:relative}
+  .thumb span{position:absolute;right:6px;bottom:5px;font-size:9.5px;color:#fff;opacity:.7}
+  .tagseam{font-size:9.5px;color:var(--purple);border:1px dashed var(--purple);border-radius:5px;
+    padding:1px 6px;display:inline-block;margin-top:7px}
+
+  /* card detail (the gate) */
+  .detailgrid{display:grid;grid-template-columns:1.3fr 1fr;gap:0}
+  .detail{padding:22px 26px}
+  .detail .h{font-size:20px;font-weight:800;line-height:1.3}
+  .detail .body{font-size:13.5px;color:#36322c;margin-top:12px;white-space:pre-line}
+  .meta{border-left:1px solid var(--line);background:var(--panel);padding:22px 22px}
+  .prop{display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:12.5px;padding:7px 0;border-bottom:1px solid var(--line2)}
+  .prop .k{color:var(--faint)}
+  .gate{margin-top:18px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px}
+  .gate .lab{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--coral);font-weight:700;margin-bottom:10px}
+  .btns{display:flex;gap:8px}
+  .btn{flex:1;text-align:center;font-size:13px;font-weight:600;border-radius:7px;padding:9px 0;color:#fff;cursor:default}
+  .btn.app{background:var(--teal)} .btn.com{background:var(--navy)} .btn.rej{background:var(--coral)}
+  .cmt{margin-top:11px;border:1px solid var(--line);border-radius:7px;padding:9px 11px;font-size:12.5px;color:var(--soft)}
+  .flow{font-size:12px;color:var(--purple);margin-top:11px;display:flex;align-items:center;gap:6px}
+
+  /* dashboard */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;padding:4px 0 6px}
+  .kpi{border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:#fff}
+  .kpi .n{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.07em}
+  .kpi .v{font-size:25px;font-weight:800;margin-top:6px}
+  .kpi .t{font-size:12px;margin-top:3px}
+  .up{color:#0b8a5b} .down{color:var(--coral)}
+  .menu{font-size:12.5px;color:var(--soft);margin-top:12px}
+  .chip{display:inline-block;font-size:11.5px;border:1px solid var(--line);border-radius:20px;padding:3px 10px;margin:4px 5px 0 0}
+  .chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+
+  /* calendar */
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;font-size:11.5px}
+  .cal .dow{color:var(--faint);font-weight:600;text-align:center;padding-bottom:2px}
+  .cal .day{border:1px solid var(--line);border-radius:7px;min-height:84px;padding:5px}
+  .cal .day b{color:var(--faint);font-weight:600;font-size:11px}
+  .ev{font-size:9.5px;border-radius:4px;padding:3px 6px;margin-top:4px;color:#fff;line-height:1.3}
+  .ev .pf{display:block;opacity:.8;font-size:8.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+  .ev.li{background:#2e5cb8} .ev.ig{background:#c13584} .ev.ad{background:var(--coral)}
+
+  /* schema table */
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--line2)}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);font-weight:600}
+  td .who{font-size:10.5px;border-radius:5px;padding:1px 7px;font-weight:600}
+  .w-built{background:var(--light);color:#0b6b53}
+  .w-seam{background:#efe7f0;color:var(--purple)}
+  .w-human{background:#ffe9eb;color:#b3344a}
+  .note{font-size:12.5px;color:var(--soft);padding:14px 22px;background:var(--panel);border-top:1px solid var(--line)}
+  .arrow{color:var(--faint)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>AI CMO — Notion system design <span style="color:var(--faint);font-weight:600;font-size:16px">(mockup)</span></h1>
+  <p class="sub">How the client experiences the AI CMO. One guest seat per client, everyone gets the full database, the dashboard is the only thing that changes. This is where the client approves, comments, and rejects. Reject sends the post back to the Brain.</p>
+  <div class="legend">
+    <span><i class="dot built"></i> Built now (our team: Brain + Notion)</span>
+    <span><i class="dot seam"></i> Seam — other builders plug in later (Studio / Mission / Ads)</span>
+    <span><i class="dot human"></i> The one human decision</span>
+  </div>
+
+  <!-- A. MULTI-CLIENT MODEL -->
+  <div class="section">
+    <h2>Architecture</h2>
+    <div class="t">One guest seat per client. Full isolation.</div>
+    <div class="d">Each client is a guest on their own page under the HQ workspace. Each page holds that client's own full Content Pipeline database (same schema for everyone) plus their own dashboard. No client can ever see another. A new client is provisioned from one template: page + database + dashboard.</div>
+    <div style="padding:0 22px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:13px">
+      <div style="border:1px solid var(--line);border-radius:9px;padding:12px 16px;background:var(--panel)">
+        <b>HQ workspace</b><div style="color:var(--faint);font-size:11.5px">Shannon · the engine writes here</div>
+      </div>
+      <span class="arrow">guest-shares →</span>
+      <div style="border:1px solid var(--teal);border-radius:9px;padding:12px 16px">Lumen Skin Studio<div style="color:var(--faint);font-size:11.5px">own DB + dashboard</div></div>
+      <div style="border:1px solid var(--line);border-radius:9px;padding:12px 16px">Client B<div style="color:var(--faint);font-size:11.5px">own DB + dashboard</div></div>
+      <div style="border:1px solid var(--line);border-radius:9px;padding:12px 16px">Client C<div style="color:var(--faint);font-size:11.5px">own DB + dashboard</div></div>
+    </div>
+  </div>
+
+  <!-- B. THE CLIENT WORKSPACE + BOARD -->
+  <div class="section">
+    <h2>The client's workspace · section 3 + 5</h2>
+    <div class="t">The Content Pipeline board</div>
+    <div class="d">Every idea moves left to right through one status. Six steps run themselves; one is the client. The client drops ideas in <b>Intake</b> and acts on cards in <b>In Review</b>.</div>
+    <div class="app">
+      <div class="side">
+        <div class="ws"><span class="av">L</span> Lumen Skin · AI CMO <span class="guest">guest</span></div>
+        <div class="grp">Workspace</div>
+        <div class="item active"><span class="ic">📋</span> Content Pipeline</div>
+        <div class="item"><span class="ic">📊</span> Dashboard</div>
+        <div class="item"><span class="ic">✏️</span> Intake · add an idea</div>
+        <div class="item"><span class="ic">🎨</span> Brand &amp; Voice</div>
+        <div class="item"><span class="ic">💬</span> Requests</div>
+        <div class="grp">This board</div>
+        <div class="item"><span class="ic">▦</span> Board</div>
+        <div class="item"><span class="ic">📅</span> Calendar</div>
+        <div class="item"><span class="ic">▤</span> Table</div>
+      </div>
+      <div class="main">
+        <div class="crumb">Lumen Skin · AI CMO / Content Pipeline</div>
+        <div class="pagetitle">Content Pipeline</div>
+        <div class="viewtabs"><div class="on">Board</div><div>Calendar</div><div>Table</div></div>
+        <div class="board">
+          <div class="col">
+            <h3>Intake <b>1</b></h3>
+            <div class="card"><div class="ttl">Client idea: spring sensitive-skin campaign</div><span class="pill warn">from client</span></div>
+          </div>
+          <div class="col">
+            <h3>Draft <b>1</b></h3>
+            <div class="card"><div class="ttl">The 10-step routine is a trap</div><span class="pill pi">Education</span></div>
+          </div>
+          <div class="col">
+            <h3>In Review <b>1</b></h3>
+            <div class="card" style="border-color:var(--coral);box-shadow:0 0 0 1px var(--coral)">
+              <div class="ttl">why competitors all sound the same is not a skincare problem</div>
+              <span class="pill pi">Behind the studio</span><span class="pill qc">QC 92</span>
+              <div class="thumb"><span>composite image</span></div>
+              <div style="font-size:10.5px;color:var(--coral);margin-top:8px;font-weight:600">⬤ needs the client</div>
+            </div>
+          </div>
+          <div class="col">
+            <h3>Approved <b>2</b></h3>
+            <div class="card"><div class="ttl">Three things that actually move the needle</div><span class="pill qc">QC 88</span></div>
+            <div class="card"><div class="ttl">Why we cut our product line in half</div><span class="pill qc">QC 90</span></div>
+          </div>
+          <div class="col">
+            <h3>Scheduled <b>1</b></h3>
+            <div class="card"><div class="ttl">The routine that fits in 90 seconds</div><span class="tagseam">Mission writes →</span></div>
+          </div>
+          <div class="col">
+            <h3>Published <b>1</b></h3>
+            <div class="card"><div class="ttl">What "clean" actually means on a label</div><span class="tagseam">Mission + Ads →</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="note">Status is the spine. <b>Intake → Draft → In Review → Approved → Scheduled → Published.</b> Off-ramps: <b>Reject</b> (back to the start) and <b>Needs revision</b> (small fix). SQLite stays the source of truth; the board mirrors it both ways.</div>
+  </div>
+
+  <!-- C. CARD DETAIL = THE GATE -->
+  <div class="section">
+    <h2>The one human decision · section 5</h2>
+    <div class="t">Open a card → approve, comment, or reject</div>
+    <div class="d">This is the whole thesis. The client opens the In Review card on their phone, sees the post and the on-brand image, and makes one decision. Reject sends it back to the Brain with their comment as the instruction, so the next draft is better.</div>
+    <div class="detailgrid">
+      <div class="detail">
+        <div class="h">why competitors all sound the same is not a skincare problem. It is a routine problem.</div>
+        <div class="body">If you are Overwhelmed Olivia, you have heard this a hundred ways. Here is what actually moves the needle for your skin, without the 10-step routine. Pick three things, do them every day, give it four weeks.
+
+Simple beats fancy. That is the Lumen Skin Studio way.</div>
+        <div class="thumb" style="height:150px;margin-top:16px"><span>on-brand composite (Studio renders this)</span></div>
+        <span class="tagseam" style="margin-top:10px">image + QC score written by Studio (seam)</span>
+      </div>
+      <div class="meta">
+        <div class="prop"><span class="k">Status</span><span><span class="pill" style="background:#fde8ea;color:#b3344a">In Review</span></span></div>
+        <div class="prop"><span class="k">Pillar</span><span>Behind the studio</span></div>
+        <div class="prop"><span class="k">Brand QC Score</span><span>92 / 100</span></div>
+        <div class="prop"><span class="k">Platform</span><span>Instagram</span></div>
+        <div class="prop"><span class="k">Post ID</span><span style="color:var(--faint)">11ce061d…</span></div>
+        <div class="gate">
+          <div class="lab">⬤ The client decides</div>
+          <div class="btns">
+            <div class="btn app">✓ Approve</div>
+            <div class="btn com">💬 Comment</div>
+            <div class="btn rej">✕ Reject</div>
+          </div>
+          <div class="cmt">"Love the angle, but soften the line about competitors." — client comment</div>
+          <div class="flow">↺ Reject + comment → back to the Brain → re-drafted from the note</div>
+        </div>
+      </div>
+    </div>
+    <div class="note"><b>Approve</b> → moves forward to Scheduled (Mission). <b>Comment</b> → captured as the steering note. <b>Reject</b> → status returns to the start and the Brain re-runs with the comment. Every rejection sharpens the next draft.</div>
+  </div>
+
+  <!-- D. DASHBOARD -->
+  <div class="section">
+    <h2>The dashboard · section 6</h2>
+    <div class="t">Per-client KPIs, chosen from a standard menu</div>
+    <div class="d">Everyone has the same database. The dashboard is the part that changes per client. At setup you pick which KPIs matter to that client and the dashboard is built from them. Live data wiring (GA4 / GSC / social / Stripe) is a documented seam for later; the structure is built now.</div>
+    <div class="main" style="padding:0 22px 18px">
+      <div class="kpis">
+        <div class="kpi"><div class="n">Followers</div><div class="v">4,210</div><div class="t up">▲ 6.1% this week</div></div>
+        <div class="kpi"><div class="n">Engagement rate</div><div class="v">5.8%</div><div class="t up">▲ 0.7 pts</div></div>
+        <div class="kpi"><div class="n">Website visits</div><div class="v">1,860</div><div class="t up">▲ 14% (GA4)</div></div>
+        <div class="kpi"><div class="n">Website conversions</div><div class="v">42</div><div class="t up">▲ 5 · 2.3% rate</div></div>
+        <div class="kpi"><div class="n">Posts shipped</div><div class="v">12</div><div class="t" style="color:var(--faint)">this month</div></div>
+        <div class="kpi"><div class="n">Leads / DMs</div><div class="v">37</div><div class="t up">▲ 9</div></div>
+      </div>
+      <div class="menu">
+        <b>Standard KPI menu</b> (pick per client at setup):
+        <div style="margin-top:6px">
+          <span class="chip on">Followers</span><span class="chip on">Engagement rate</span><span class="chip on">Website visits</span><span class="chip on">Website conversions</span><span class="chip on">Posts shipped</span><span class="chip on">Leads / DMs</span>
+          <span class="chip">Top landing pages</span><span class="chip">SEO rank</span><span class="chip">AEO citations</span><span class="chip">Revenue / MRR</span><span class="chip">CTR</span><span class="chip">ROAS</span>
+        </div>
+      </div>
+    </div>
+    <div class="note">Built now: the dashboard structure + KPI selection + a Metrics table per client. <span style="color:var(--purple)">Seam:</span> the integrations that feed real numbers, and chart embeds (Data Jumbo), come when Mission/Analytics is built.</div>
+  </div>
+
+  <!-- E. CREATIVES + CALENDAR (design-later seams) -->
+  <div class="section">
+    <h2>Distribution &amp; paid · section 4 + 5 (design, build later)</h2>
+    <div class="t">Creatives table + scheduled calendar</div>
+    <div class="d">From your sketch. These fields exist in the schema now so the other builders' stations write into the same cards. The paid-ads loop (top performers → Meta) is theoretical for the hackathon, defined as a seam.</div>
+    <div style="padding:4px 0 0">
+      <table>
+        <tr><th>Creative</th><th>Type</th><th>Platform</th><th>Status</th><th>CTR</th><th>ROAS</th><th>Owner</th></tr>
+        <tr><td>The 10-step routine is a trap</td><td>Product showcase</td><td>Instagram</td><td>Published</td><td>2.4%</td><td>—</td><td><span class="who w-seam">Mission</span></td></tr>
+        <tr><td>Founder story: why we cut the line</td><td>UGC video</td><td>Instagram</td><td>Staged</td><td>—</td><td>—</td><td><span class="who w-seam">Studio</span></td></tr>
+        <tr><td>Three things that move the needle</td><td>Carousel</td><td>Meta ad</td><td>To do</td><td>—</td><td>—</td><td><span class="who w-seam">Ads</span></td></tr>
+      </table>
+    </div>
+    <div class="main" style="padding:16px 22px 18px">
+      <div class="cal">
+        <div class="dow">Mon</div><div class="dow">Tue</div><div class="dow">Wed</div><div class="dow">Thu</div><div class="dow">Fri</div><div class="dow">Sat</div><div class="dow">Sun</div>
+        <div class="day"><b>9</b><div class="ev li"><span class="pf">LinkedIn · 9a</span>The 10-step routine is a trap</div></div>
+        <div class="day"><b>10</b></div>
+        <div class="day"><b>11</b><div class="ev ig"><span class="pf">Instagram · 12p</span>Three things that move the needle</div></div>
+        <div class="day"><b>12</b></div>
+        <div class="day"><b>13</b><div class="ev ig"><span class="pf">Instagram · 11a</span>The 90-second routine</div><div class="ev ad"><span class="pf">Meta ad</span>Why we cut the line</div></div>
+        <div class="day"><b>14</b></div>
+        <div class="day"><b>15</b></div>
+      </div>
+    </div>
+    <div class="note"><span style="color:var(--purple)">Seam:</span> the whole distribution + paid layer is owned by other builders. We define the fields and the calendar view; they fill them when their stations connect.</div>
+  </div>
+
+  <!-- F. WHO WRITES WHAT -->
+  <div class="section">
+    <h2>The contract · Notion is the hub</h2>
+    <div class="t">Every field, and who fills it</div>
+    <div class="d">The Notion card is the shared state across all builders. We define the whole schema now and fill our fields. The others write theirs when their stations land. Nothing of ours changes.</div>
+    <table>
+      <tr><th>Field</th><th>Meaning</th><th>Written by</th></tr>
+      <tr><td>Title · Pillar · Hook · Draft Caption · Angle</td><td>the post itself</td><td><span class="who w-built">Brain (us)</span></td></tr>
+      <tr><td>Status · client comment</td><td>the gate decision + feedback</td><td><span class="who w-human">Client</span> → read by us</td></tr>
+      <tr><td>Composite Image · Brand QC Score · Aspect Ratio</td><td>the visual + QC</td><td><span class="who w-seam">Studio</span></td></tr>
+      <tr><td>Scheduled For · Published URL</td><td>distribution</td><td><span class="who w-seam">Mission</span></td></tr>
+      <tr><td>Creative Type · Platform · CTR · ROAS · ad status</td><td>paid &amp; performance</td><td><span class="who w-seam">Ads</span></td></tr>
+      <tr><td>KPIs (Metrics table)</td><td>the dashboard</td><td><span class="who w-built">us (structure)</span> + <span class="who w-seam">Analytics</span></td></tr>
+    </table>
+    <div class="note">Build now: provision a client (page + DB + dashboard), push our drafts in, read the gate back (approve / comment / reject-to-Brain), basic dashboard. Everything purple is a defined seam, ready to connect.</div>
+  </div>
+
+</div>
+</body>
+</html>
