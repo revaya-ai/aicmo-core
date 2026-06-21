@@ -12,7 +12,7 @@ def _select(options):
     return {"select": {"options": [{"name": o} for o in options]}}
 
 
-STATUS_OPTIONS = ["Captured", "For Review", "Scheduled", "Published", "Rejected"]
+STATUS_OPTIONS = ["Captured", "In Review", "Scheduled", "Published", "Rejected"]
 
 # Content Pipeline database = ORGANIC. Stages + the post + engagement metrics.
 # Engagement (follows/likes/comments/shares) is produced by Mission's analytics
@@ -72,8 +72,8 @@ METRICS_PROPERTIES = {
 STATUS_SQLITE_TO_NOTION = {
     "captured": "Captured",
     "drafted": "Captured",
-    "qc_review": "For Review",
-    "needs_revision": "For Review",
+    "qc_review": "In Review",
+    "needs_revision": "In Review",
     "approved": "Scheduled",
     "rejected": "Rejected",
     "scheduled": "Scheduled",
