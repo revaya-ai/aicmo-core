@@ -2,20 +2,22 @@
 
 **The AI CMO.** A content marketing department that runs as software.
 
-This is the hackathon build. One content idea ("a post") is a single database
-row that walks through a status pipeline. Each station reads the row at one
-status, does its job, and advances it to the next. **Two pieces are now real:
-Station 1 (the Brain) and the Notion database, both built by our team** (see
-"What our team built" below). The remaining stations are still stubs that return
-canned data, swapped for real logic without ever touching the contract.
+One content idea ("a post") is a single database row that walks through a status
+pipeline. Each station reads the row at one status, does its job, and advances it
+to the next: it ideates, designs, gets human sign-off, publishes, measures, and
+recommends paid promotion on the winners.
 
-> **The full system is bigger than this loop.** This repo is the engine. For the
-> whole platform across all six sections (onboarding/VPS, content engine, render,
-> orchestrator/distribution, analytics/SEO/GEO, client dashboard), with the build
-> status of every component, see [`docs/BUILD-TARGET.md`](docs/BUILD-TARGET.md).
-> For every environment variable the full system needs, see
-> [`.env.example`](.env.example). For the named-tool audit, see
-> [`docs/qa/reference-architecture.md`](docs/qa/reference-architecture.md).
+The whole loop runs OFFLINE on the Python standard library with no API keys.
+Every external service (image render, publishing, analytics, ad platforms) has a
+stub that runs by default and only calls the real service when the matching env
+var is set. So a fresh clone walks a seed idea from `captured` all the way to
+`ad_live` with one command and no setup.
+
+This repo is the engine. The Brain (Station 1) and the Notion client are real;
+the other stations run as stubs today and swap in real logic without ever
+touching the contract. The full platform across all six sections, with the build
+status of every component, is mapped in
+[`docs/BUILD-TARGET.md`](docs/BUILD-TARGET.md).
 
 ## Who this is for (ICP)
 A small business with a marketing team of one, or a founder who can't afford a
@@ -26,85 +28,11 @@ on the winners.
 Demo client: **Lumen Skin Studio**, a small-batch skincare brand
 (`client-data/lumen-skin/`).
 
----
-
-## What our team built (Card 1: Brain + the Notion database)
-
-Our team owns two pieces. Both are real (not stubs), verified, and pushed. This
-section is what we present.
-
-### 1. The Brain (Station 1), idea to on-brand draft
-
-**What it is:** the "Think + Write" station. It turns a typed seed idea into an
-on-brand drafted post, grounded in the client's own brand files, using the Brick
-chain. No generic AI mush, because every post is five locked decisions before a
-word is written.
-
-- **The craft** lives in `.claude/skills/`: `content-os` (the 5-step Brick chain:
-  Voice-of-Customer → Intake → Topic → Angle → Hook → Story), `writing-style`
-  (anti-AI-slop), `positioning-angles`, `hook-library`, `story-structures`.
-- **The command** `/ai-cmo-generate "<seed idea>"` runs the chain in Claude Code,
-  loads the 6-layer client context, and persists the draft via
-  `engine/save_draft.py`.
-- **The offline engine** `engine/brain/generate.py` + `voc.py` parse the real
-  client context (pillars, audience, voice) and produce a grounded draft with no
-  API key, so the pipeline is testable offline.
-
-Run it (offline, no keys):
-
-```bash
-python3 run.py "why competitors all sound the same"     # full loop; Brain is the first real station
-# or persist a draft the exact way the command does:
-python3 engine/save_draft.py --client lumen-skin --seed "..." \
-  --pillar "Education" --angle "..." --hook "..." --body "..."
-```
-
-**How to present it:** "Marketing's bottleneck was never the writing, it was the
-deciding. The Brain makes five locked decisions, pillar, angle, hook, story,
-grounded in the client's own brand files, before it writes a word."
-
-### 2. The Notion database (the human gate + client surface)
-
-**What it is:** the client's real Notion board where every post lives and where
-the one human decision happens, Approve or Reject, from a phone. SQLite stays the
-engine's source of truth; Notion is the human surface, with a read-back that
-turns the client's tap into a pipeline advance.
-
-- `engine/dashboard/notion_provision.py`, creates the Content Pipeline database
-  (the columns from Jen's board) in your Notion page.
-- `engine/dashboard/notion_sync.py`, `push` (pipeline → board) and `pull` (the
-  client's Approve/Reject → advances SQLite).
-- `engine/dashboard/notion_schema.py`, property schema + status maps.
-  `notion_client.py`, the API wrapper (stdlib, no extra install).
-
-Run it (offline stub, no Notion account needed):
-
-```bash
-python3 engine/dashboard/notion_provision.py     # prints the schema, writes a stub db id
-python3 engine/dashboard/notion_sync.py push     # writes outputs/notion-mirror.json (the stub board)
-# flip a card's status_label to "Approved" to simulate the client, then:
-python3 engine/dashboard/notion_sync.py pull     # advances the matching post to approved
-```
-
-**Go live:** set `NOTION_TOKEN` + `NOTION_PARENT_PAGE_ID`, then the same commands
-hit the real Notion API. Same card shape, nothing downstream changes.
-
-**How to present it:** "Six steps run themselves, the seventh is a person. They
-open Notion, tap Approve, and the post ships. We built the board, the push, and
-the read-back. One tap, eight seconds, from anywhere."
-
-### Notion or a custom app?
-
-Notion is the fast surface and it is what we demo. But SQLite is the source of
-truth and Notion is just one surface hanging off `notion_sync`. For a real $1M
-client you put a branded app on the same engine, no change to the Brain or the
-pipeline. The database was never the product. The engine was.
-
 ## The contract-first rule
 `db.py` is the **frozen contract**. It defines the `posts` table, the `Status`
-constants, and the helper functions every station uses. Changing it requires
-**all three builders to agree**, a schema change breaks everyone at once.
-Everything else (the station internals) is yours to rewrite freely.
+constants, and the helper functions every station uses. Changing it requires all
+builders to agree. A schema change breaks everyone at once. Everything else (the
+station internals) is yours to rewrite freely.
 
 ## The status pipeline
 
@@ -133,42 +61,74 @@ ad_live
 
 Off-ramps: `needs_revision` and `rejected` (set at the human gate or by QC).
 
-## The 4 stations (who owns what)
+## The 4 stations
 
-| Station | Folder | Reads -> Writes | Owner |
+| Station | Folder | Reads -> Writes | What it does |
 |---|---|---|---|
-| 1. Brain | `engine/brain/` | `captured` -> `drafted` (Intake→Topic→Angle→Hook→Story brick chain) | Builder A |
-| 2. Studio | `engine/studio/` | `drafted` -> image -> `qc_review` / `needs_revision` (HTML→PNG render + vision QC ≥85) | Builder B |
-| 3. Mission | `engine/mission/` | `qc_review` -> `approved` -> `scheduled` -> `published` -> `analyzed` (human gate + publish + analytics) | Builder C |
-| 4. Ads | `engine/ads/` | `analyzed` -> `ad_recommended` -> `ad_approved` -> `ad_live` (recommend-only, human spend gate) | Builder C |
+| 1. Brain | `engine/brain/` | `captured` -> `drafted` | Turns a seed idea into an on-brand draft via the Brick chain (Intake, Topic, Angle, Hook, Story), grounded in the client's own brand files. |
+| 2. Studio | `engine/studio/` | `drafted` -> image -> `qc_review` / `needs_revision` | Renders the post to a 1080x1350 graphic and scores it against the brand spec (vision QC). |
+| 3. Mission | `engine/mission/` | `qc_review` -> `approved` -> `scheduled` -> `published` -> `analyzed` | The human approval gate, then schedule, publish, and pull analytics. |
+| 4. Ads | `engine/ads/` | `analyzed` -> `ad_recommended` -> `ad_approved` -> `ad_live` | Recommends paid promotion on winners only, behind a human spend gate. |
 
-## How to run
+The one human decision lives between render and publish: `mission.gate`. For which
+stations are real, stubbed, or not built, see
+[`docs/BUILD-TARGET.md`](docs/BUILD-TARGET.md).
 
-No installs needed for the stub loop. Standard library only.
+## How to run the loop
+
+No installs needed. Standard library only.
 
 ```bash
-python run.py "why your competitors all sound the same"
+python3 run.py "why your competitors all sound the same"
 ```
 
 This creates a post, walks it through every station, prints each status
-transition, and prints the final row as JSON. It runs green on minute one.
+transition, and prints the final row as JSON. The post ends at `ad_live` if it is
+a winner, or `analyzed` if its engagement does not clear the promote threshold.
 
-The human gate and the ad spend gate auto-approve in `run.py` (via
-`auto_approve=True`) so the demo completes unattended.
+The published URL is a stub; real publishing needs `ZERNIO_API_KEY`. The Notion
+board writes to `outputs/notion-mirror.json` offline, and to a real board behind
+`NOTION_TOKEN` plus `NOTION_PARENT_PAGE_ID`. The human gate and the ad spend gate
+auto-approve in `run.py` (via `auto_approve=True`) so the loop completes
+unattended; in production a person taps Approve in Notion.
 
-## For builders
+## The Brain command
 
-1. Read `db.py`. That is the contract. **Do not change it** without the other
-   two builders agreeing.
-2. Open your station file. The docstring tells you exactly which status you read,
-   which status you write, and the function signature.
-3. Find the `# TODO(builder):` markers. Replace the stub logic there with real
-   logic. Keep the same read/write statuses and the same `run(post_id,
-   auto_approve=False)` signature.
-4. Run `python run.py "..."` after every change. The loop must stay green.
+The craft lives in skills, the Brain runs through a command. `/ai-cmo-generate`
+is a Claude Code command, not a shell command. Without Claude Code, walk the loop
+with `python3 run.py "<seed>"`.
 
-Real builds will need the deps in `requirements.txt` and the keys in
-`.env.example` (copy it to `.env`). The stub loop needs neither.
+| Command | Walks | Skills loaded |
+|---|---|---|
+| `/ai-cmo-generate "<seed>"` | `captured` -> `drafted` | content-os, positioning-angles, writing-style, hook-library, story-structures |
+
+## The full architecture
+
+The four-station loop is the spine. The complete platform adds onboarding and VPS
+setup, the front-of-funnel intelligence and AEO layer, the render and Placid
+backends, distribution scheduling, and the analytics, SEO, GEO, and client
+dashboard layer. All of it, section by section with the build status of every
+component, is in [`docs/BUILD-TARGET.md`](docs/BUILD-TARGET.md). The reference
+implementation for the parts not yet built here lives in the sibling repo
+`aicmo-complete`.
+
+## Going real (optional)
+
+Each stub upgrades to the real service by setting one env var. The loop never
+needs any of these. Every variable the full system uses, grouped by station and
+commented, is in [`.env.example`](.env.example). Today the only env vars the
+engine actually reads are `NOTION_TOKEN` and `NOTION_PARENT_PAGE_ID` (the Notion
+board). The rest are the seams each station wires as it goes real. For the
+named-tool audit (which service each station reads, and its real status), see
+[`docs/qa/reference-architecture.md`](docs/qa/reference-architecture.md).
+
+## QA
+
+This system is checked against its source materials, not just against itself. The
+QA approach, the auditor charter, and the audit trail live in
+[`docs/qa/README.md`](docs/qa/README.md). The principle: a QA pass that audits the
+code against an incomplete spec still ships an incomplete system, so the spec
+itself gets audited against the source.
 
 ## Layout
 
@@ -176,7 +136,11 @@ Real builds will need the deps in `requirements.txt` and the keys in
 db.py            # FROZEN CONTRACT (schema + helpers)
 run.py           # orchestrator, walks one idea through every station
 client-data/     # 6-layer context per client (lumen-skin demo)
-templates/       # social post template (Station 2 screenshots this)
-engine/          # the 4 stations
+templates/       # social post template (Station 2 renders this)
+engine/          # the 4 stations + the Notion dashboard client
+.claude/skills/  # the craft: content-os, positioning-angles, writing-style, hook-library, story-structures
+.claude/commands/ # the Brain: ai-cmo-generate
+docs/            # BUILD-TARGET.md (full map), qa/ (audit), notion-setup.md, superpowers/ (plans + specs)
 data/            # aicmo.db created here (gitignored)
+outputs/         # notion-mirror.json (stub board, gitignored)
 ```
