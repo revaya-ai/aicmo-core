@@ -89,8 +89,6 @@ def _read_develop_confirm(post_id: str) -> str | None:
 
     In real Notion mode (NOTION_TOKEN configured), this returns ``None`` as a
     safe no-op placeholder — real Notion integration is deferred.
-
-    # TODO: wire real Notion develop_confirm property read
     """
     notion_token = os.environ.get("NOTION_TOKEN")
     if notion_token:

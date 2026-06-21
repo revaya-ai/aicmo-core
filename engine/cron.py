@@ -17,6 +17,7 @@ before any other project import.
 import engine.env  # noqa: F401 — must be first project import to load .env
 
 import argparse
+import os
 import sys
 
 JOBS = {
@@ -29,6 +30,7 @@ JOBS = {
 
 
 def _run(job: str, client: str):
+    os.makedirs("outputs/logs", exist_ok=True)
     if job not in JOBS:
         print(f"[cron] Unknown job: {job!r}. Valid jobs: {', '.join(JOBS)}", file=sys.stderr)
         sys.exit(1)

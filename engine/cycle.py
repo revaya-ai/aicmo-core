@@ -3,7 +3,7 @@
 
 sweep(client) -> int
     Walk every 'captured' row for the given client through:
-        ai_cmo_generate (draft) -> seo_guardrails (score) -> render -> brand_qc
+        ai_cmo_generate (draft) -> render -> brand_qc -> (append seo + compliance advisory flags at qc_review)
     Lands each post at 'qc_review' (or 'needs_revision' on QC fail).
     NEVER writes Status.APPROVED.
 
