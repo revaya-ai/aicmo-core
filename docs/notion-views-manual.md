@@ -5,17 +5,22 @@ section headings automatically. Two things the Notion API cannot reliably create
 are **board** and **calendar** views, so finish those by hand once per client.
 Open the "Lumen Skin Studio — AI CMO" page first.
 
-## 1. Board view (the pipeline kanban)
+## 1. Board view grouped by STAGE (not Pillar)
 
-1. On the **Content Pipeline** database, click the view name at its top-left (it
-   says **Table**), then **+ New view** (or the small dropdown next to the view).
-2. Choose **Board**.
-3. Open the board's **•••** (or the layout settings) → **Group by** → select
-   **Status**.
-4. Name the view **Board**.
+The board defaults to grouping by **Pillar**. Switch it to **Status** (the stage):
 
-You now get columns: Idea · Draft · In Review · Approved · Rejected · Scheduled ·
-Published, matching the mockup. Drag the **Board** view to be the default (left-most).
+1. On the **Content Pipeline** board, click the **•••** (top-right of the view) →
+   **Group** → **Group by** → choose **Status**.
+2. Turn on **Hide empty groups** (removes leftover legacy columns that have no
+   cards).
+3. Optional: open the **Status** property and delete any old options you don't
+   want (Idea, Draft, In Review, Approved, Analyzed, Needs revision). The live
+   stages are **Captured · For Review · Scheduled · Published · Rejected**.
+
+You now get stage columns: **Captured → For Review → Scheduled → Published**
+(+ Rejected). The client approves a **For Review** card by dragging it forward to
+**Scheduled**; rejects by dragging it to **Rejected** (which loops it back to the
+Brain to re-draft).
 
 ## 2. Calendar view (scheduled posts)
 

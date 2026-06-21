@@ -12,10 +12,7 @@ def _select(options):
     return {"select": {"options": [{"name": o} for o in options]}}
 
 
-STATUS_OPTIONS = [
-    "Idea", "Draft", "In Review", "Approved",
-    "Rejected", "Needs revision", "Scheduled", "Published", "Analyzed",
-]
+STATUS_OPTIONS = ["Captured", "For Review", "Scheduled", "Published", "Rejected"]
 
 # Content Pipeline database properties.
 PIPELINE_PROPERTIES = {
@@ -57,25 +54,26 @@ METRICS_PROPERTIES = {
     "Is Mock": {"checkbox": {}},
 }
 
-# SQLite status -> Notion Status label.
+# SQLite status -> Notion Status (the STAGE the board groups by).
 STATUS_SQLITE_TO_NOTION = {
-    "captured": "Idea",
-    "drafted": "Draft",
-    "qc_review": "In Review",
-    "needs_revision": "In Review",
-    "approved": "Approved",
+    "captured": "Captured",
+    "drafted": "Captured",
+    "qc_review": "For Review",
+    "needs_revision": "For Review",
+    "approved": "Scheduled",
     "rejected": "Rejected",
     "scheduled": "Scheduled",
     "published": "Published",
-    "analyzed": "Analyzed",
-    "ad_recommended": "Analyzed",
-    "ad_approved": "Analyzed",
+    "analyzed": "Published",
+    "ad_recommended": "Published",
+    "ad_approved": "Published",
     "ad_live": "Published",
 }
 
-# The human gate read-back (content).
-APPROVE_LABELS = {"Approved": "approved"}        # advance forward
-SEND_BACK_LABELS = {"Rejected", "Needs revision"}  # -> send back to the Brain
+# The human gate read-back (content): the client moves a "For Review" card on the
+# board. Forward (Scheduled/Published) = approve; Rejected = back to the Brain.
+APPROVE_LABELS = {"Scheduled", "Published"}
+SEND_BACK_LABELS = {"Rejected"}
 
 # The second human gate read-back (ad spend), set on the "Ad Status" field.
 AD_APPROVE_LABEL = "Approved"     # ad_recommended -> ad_approved
