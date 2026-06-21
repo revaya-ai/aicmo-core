@@ -125,7 +125,7 @@ A "ref: complete" note means a reference implementation exists in the sibling re
 |---|---|---|---|
 | Autonomous orchestration on a schedule (cron / launchd fires the loop, no human) | NOT BUILT | UNASSIGNED | `run.py` runs the loop once when a human invokes it. Nothing fires it on a schedule. This is the core prototype gap. |
 | Brain generation as Python (Anthropic SDK on the host, unattended) | NOT BUILT | UNASSIGNED (Card 1 built the offline stand-in) | `ASSIGNMENTS.md` Card 1 says "use Claude (Anthropic SDK)"; today real generation lives in the `/ai-cmo-generate` Claude Code command, not in Python. An unattended product cannot call a Claude Code command. ref: complete (`engine/brain/generate.py`). |
-| Notion as the live surface, written on schedule + decisions read back | PARTIAL | UNASSIGNED (Card 3 built the client + mirror) | The Notion client and offline JSON mirror exist and are credential-gated. The scheduled write loop and reading client decisions back into the pipeline are not wired. |
+| Notion as the live surface, written + decisions read back | REAL (read-back built; only the scheduled trigger is missing) | Mission Control / dashboard layer | `engine/dashboard/notion_provision.py` creates a real child page + Content Pipeline DB + Metrics DB; `notion_sync.py` pushes posts and `pull_gate` reads the client's approve/reject decision back into the loop; `notion_layout.py` lays out dashboard tiles. Credential-gated (`NOTION_TOKEN`, `NOTION_PARENT_PAGE_ID`), offline fallback writes `outputs/<client>-board.json` + `data/notion_state.json`. What is missing is firing the sync on a schedule (folds into the cron row above). Board/calendar views remain a manual Notion-UI step. |
 | Host setup: local cron / launchd jobs (prototype), then VPS lift | NOT BUILT | UNASSIGNED | No job definitions exist yet. The launchd pattern is well established in Shannon's workspace and lifts cleanly to an Ubuntu VPS later. |
 
 ### 5.1 Overview, multi-repo architecture
@@ -184,14 +184,17 @@ A "ref: complete" note means a reference implementation exists in the sibling re
 
 ### 5.6 Analytics, SEO, GEO, client dashboard
 
-This entire section is absent from this repo today.
+Most of this section is absent, with one real exception: the Notion client
+dashboard layer (see 5.0). The analytics, SEO, GEO, reporting, and metrics modules
+are not built.
 
 | Component | Status | Owner | Note |
 |---|---|---|---|
 | External sources: GA4, Search Console, DataForSEO, AIO engines, Stripe | NOT BUILT | UNASSIGNED | ref: complete has DataForSEO + AEO/AIO. |
 | DataOS `collect.py` (daily cron) + `generate_metrics.py` | NOT BUILT | UNASSIGNED | ref: complete has `intelligence` + `aeo`. |
 | Reporting crons (weekly brief, portfolio digest, weekly report) | NOT BUILT | UNASSIGNED | ref: complete has `dashboard/report.py` + `metrics.py`. |
-| Client dashboard (`/dashboard-setup`, metrics push, scaffold page) | NOT BUILT | UNASSIGNED | Honesty gate: tiles with no live data are withheld, never faked. |
+| Client dashboard (scaffold page, metrics tiles) | PARTIAL | Mission Control / dashboard layer | `notion_provision.py` + `notion_layout.py` scaffold a real Notion dashboard page and tiles; `kpi_menu.py` holds the KPI menu config but its values are mock until real metrics are wired. The Data Jumbo embed stays manual. |
+| Reporting + metrics modules (`metrics.py`, `report.py`) | NOT BUILT | UNASSIGNED | Weekly brief and computed pipeline metrics. ref: complete. |
 
 ---
 
@@ -207,8 +210,14 @@ these are the blockers, all currently UNASSIGNED:
 2. **Brain generation as Python** (5.0). Move real copy generation out of the
    Claude Code command and into a Python Anthropic call on the host, so the
    unattended loop can actually write. ref: complete.
-3. **Notion as the live surface** (5.0). Write the pipeline to Notion on schedule
-   and read the client's approve/reject and spend decisions back into the DB.
+3. **Studio is a stub** (5.4). `render.py` writes no image file and `brand_qc.py`
+   returns a hardcoded passing score, so the graphic and its quality gate are not
+   real. ref: complete.
+
+Reading client decisions back from Notion is already built in core
+(`notion_sync.pull_gate`); what remains on the Notion side is firing the sync on a
+schedule, which folds into gap 1. The feedback loop, the human gate, the
+orchestrator, and the ads rationale are real.
 
 Everything else (real render, real QC, real Zernio, real ads push, the whole
 analytics section) upgrades the loop but is not required for a first unattended
