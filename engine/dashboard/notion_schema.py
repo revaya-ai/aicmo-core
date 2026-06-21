@@ -14,7 +14,9 @@ def _select(options):
 
 STATUS_OPTIONS = ["Captured", "For Review", "Scheduled", "Published", "Rejected"]
 
-# Content Pipeline database properties.
+# Content Pipeline database = ORGANIC. Stages + the post + engagement metrics.
+# Engagement (follows/likes/comments/shares) is produced by Mission's analytics
+# (engine/mission/analytics.py -> metrics_json) — we connect to it, not rebuild it.
 PIPELINE_PROPERTIES = {
     "Title": {"title": {}},
     "Post ID": {"rich_text": {}},
@@ -24,25 +26,37 @@ PIPELINE_PROPERTIES = {
     "Angle": {"rich_text": {}},
     "Hook": {"rich_text": {}},
     "Draft Caption": {"rich_text": {}},
-    "Client Comment": {"rich_text": {}},                       # client writes; we read
-    "Brand QC Score": {"number": {}},                          # Studio seam
-    "Brand QC Verdict": _select(["pass", "borderline", "fail"]),  # Studio seam
-    "Composite Image": {"files": {}},                          # Studio seam
-    "Aspect Ratio": {"select": {}},                            # Studio seam
-    "Resize Check": _select(["organic ok", "paid ok", "needs resize"]),  # Studio seam
-    "Creative Type": _select(["UGC", "Product showcase", "Video", "TV spot", "Carousel"]),  # Ads seam
-    "Platform": _select(["LinkedIn", "Instagram", "Meta ad", "X"]),  # Mission/Ads seam
-    "CTR": {"number": {}},                                     # Ads seam
-    "ROAS": {"number": {}},                                    # Ads seam
-    "Follows": {"number": {}},                                 # stage 6 — the winner metric
-    "Winner": {"checkbox": {}},                                # stage 7 — top 2-3
-    "Ad Status": _select(["Recommended", "Approved", "Live", "Declined"]),  # stages 8-10
-    "Ad Budget": {"number": {}},                               # stage 8
-    "Ad Audience": {"rich_text": {}},                          # stage 8
+    "Client Comment": {"rich_text": {}},                          # client writes; we read
+    "Brand QC Score": {"number": {}},                             # Studio
+    "Brand QC Verdict": _select(["pass", "borderline", "fail"]),  # Studio
+    "Composite Image": {"files": {}},                             # Studio
+    "Aspect Ratio": {"select": {}},                               # Studio
+    "Platform": _select(["LinkedIn", "Instagram", "X"]),          # organic platform
+    # organic engagement — connected from Mission analytics (metrics_json)
+    "Follows": {"number": {}},
+    "Likes": {"number": {}},
+    "Comments": {"number": {}},
+    "Shares": {"number": {}},
+    "Impressions": {"number": {}},
+    "Winner": {"checkbox": {}},                                   # promoted to a paid ad
     "Hashtags": {"rich_text": {}},
-    "Folder Path": {"rich_text": {}},                          # seam
-    "Scheduled For": {"date": {}},                             # Mission seam
-    "Published URL": {"url": {}},                              # Mission seam
+    "Scheduled For": {"date": {}},                                # Mission
+    "Published URL": {"url": {}},                                 # Mission
+}
+
+# Paid Ads database = PAID (the NEW component). Only the promoted winners.
+# Different fields from organic: spend, audience, CTR, ROAS — no engagement.
+PAID_PROPERTIES = {
+    "Ad Name": {"title": {}},
+    "Source Post": {"rich_text": {}},        # the content Post ID it was promoted from
+    "Platform": _select(["Meta ad", "Instagram", "Facebook"]),
+    "Creative Type": _select(["UGC", "Product showcase", "Video", "Carousel"]),
+    "Budget": {"number": {}},
+    "Audience": {"rich_text": {}},
+    "CTR": {"number": {}},
+    "ROAS": {"number": {}},
+    "Spend": {"number": {}},
+    "Ad Status": _select(["Recommended", "Approved", "Live", "Declined"]),
 }
 
 # Dashboard Metrics database properties.
@@ -87,15 +101,23 @@ AD_STATUS_FROM_PIPELINE = {
 }
 
 
-def _follows(post):
-    """Pull follows-per-post out of metrics_json (set by Mission's analytics)."""
+def _metric(post, key):
+    """Pull one engagement metric out of metrics_json (set by Mission's analytics)."""
     mj = post.get("metrics_json")
     if not mj:
         return None
     try:
-        return json.loads(mj).get("follows")
+        return json.loads(mj).get(key)
     except Exception:
         return None
+
+
+def _follows(post):
+    return _metric(post, "follows")
+
+
+_ENGAGEMENT = (("Follows", "follows"), ("Likes", "likes"), ("Comments", "comments"),
+               ("Shares", "shares"), ("Impressions", "impressions"))
 
 
 def _rt(text):
@@ -161,23 +183,41 @@ def properties_for(post):
     if post.get("scheduled_for"):
         props["Scheduled For"] = {"date": {"start": post["scheduled_for"]}}
 
-    # Paid loop (stages 6-10).
-    follows = _follows(post)
-    if follows is not None:
-        props["Follows"] = {"number": follows}
+    # Organic engagement — connected from Mission's analytics (metrics_json).
+    for label, key in _ENGAGEMENT:
+        v = _metric(post, key)
+        if v is not None:
+            props[label] = {"number": v}
     if post["status"] in AD_STATUS_FROM_PIPELINE:
-        props["Winner"] = {"checkbox": True}
-        props["Ad Status"] = {"select": {"name": AD_STATUS_FROM_PIPELINE[post["status"]]}}
-    if post.get("ad_budget") is not None:
-        props["Ad Budget"] = {"number": post["ad_budget"]}
-    if post.get("ad_audience"):
-        props["Ad Audience"] = {"rich_text": _rt(post["ad_audience"])}
+        props["Winner"] = {"checkbox": True}  # this post was promoted to a paid ad
     return props
 
 
-def _platform_label(p):
-    return {"linkedin": "LinkedIn", "instagram": "Instagram",
-            "meta-ad": "Meta ad", "x": "X"}.get((p or "").lower(), p)
+def paid_properties_for(post):
+    """Paid Ads card payload — the promoted winner (the NEW component)."""
+    title = (post.get("hook") or post.get("seed_idea") or "Untitled")[:100]
+    props = {
+        "Ad Name": {"title": _rt(title)},
+        "Source Post": {"rich_text": _rt(post["id"])},
+        "Ad Status": {"select": {"name": AD_STATUS_FROM_PIPELINE.get(post["status"], "Recommended")}},
+    }
+    if post.get("ad_budget") is not None:
+        props["Budget"] = {"number": post["ad_budget"]}
+    if post.get("ad_audience"):
+        props["Audience"] = {"rich_text": _rt(post["ad_audience"])}
+    for label, key in (("CTR", "ctr"), ("ROAS", "roas"), ("Spend", "spend")):
+        v = _metric(post, key)
+        if v is not None:
+            props[label] = {"number": v}
+    if post.get("platform"):
+        props["Platform"] = {"select": {"name": _platform_label(post["platform"], paid=True)}}
+    return props
+
+
+def _platform_label(p, paid=False):
+    if paid:
+        return "Meta ad"  # promoted winners run on Meta (FB/IG) per Jamie's method
+    return {"linkedin": "LinkedIn", "instagram": "Instagram", "x": "X"}.get((p or "").lower(), p)
 
 
 def metric_properties(kpi_label, value, trend, source, is_mock):

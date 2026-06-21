@@ -72,7 +72,17 @@ def provision_client(slug: str, kpis=None, client_name=None) -> dict:
     clients = state.setdefault("clients", {})
     rec = clients.get(slug)
     if rec and rec.get("pipeline_db_id"):
-        return rec  # already provisioned
+        # backfill the Paid Ads DB for clients provisioned before it existed
+        if not rec.get("paid_db_id"):
+            if notion_client.is_configured():
+                paid = notion_client.create_database(
+                    rec["page_id"], "Paid Ads", notion_schema.PAID_PROPERTIES)
+                rec["paid_db_id"] = paid["id"]
+            else:
+                rec["paid_db_id"] = f"stub-paid-{slug}"
+            clients[slug] = rec
+            _save_state(state)
+        return rec
 
     kpis = kpis or kpi_menu.DEFAULT_KPIS
     name = client_name or slug.replace("-", " ").title()
@@ -87,24 +97,32 @@ def provision_client(slug: str, kpis=None, client_name=None) -> dict:
         metrics = notion_client.create_database(
             page_id, "Dashboard — Metrics", notion_schema.METRICS_PROPERTIES
         )
+        paid = notion_client.create_database(
+            page_id, "Paid Ads", notion_schema.PAID_PROPERTIES
+        )
         rec = {
             "page_id": page_id,
             "pipeline_db_id": pipeline["id"],
             "metrics_db_id": metrics["id"],
+            "paid_db_id": paid["id"],
             "page_map": {},
+            "paid_map": {},
             "kpis": kpis,
             "mode": "real",
         }
     else:
         print(f"STUB provision for '{slug}' (no NOTION_TOKEN). Would create:")
         print(f"  page: '{name} — AI CMO'")
-        print(f"  Content Pipeline DB ({len(notion_schema.PIPELINE_PROPERTIES)} props)")
+        print(f"  Content Pipeline DB (organic, {len(notion_schema.PIPELINE_PROPERTIES)} props)")
+        print(f"  Paid Ads DB (the new component, {len(notion_schema.PAID_PROPERTIES)} props)")
         print(f"  Dashboard — Metrics DB, KPIs: {kpis}")
         rec = {
             "page_id": f"stub-page-{slug}",
             "pipeline_db_id": f"stub-pipe-{slug}",
             "metrics_db_id": f"stub-metrics-{slug}",
+            "paid_db_id": f"stub-paid-{slug}",
             "page_map": {},
+            "paid_map": {},
             "kpis": kpis,
             "mode": "stub",
         }
@@ -121,6 +139,8 @@ def ensure_schema(slug: str) -> dict:
     if notion_client.is_configured():
         notion_client.update_database(rec["pipeline_db_id"], notion_schema.PIPELINE_PROPERTIES)
         notion_client.update_database(rec["metrics_db_id"], notion_schema.METRICS_PROPERTIES)
+        if rec.get("paid_db_id"):
+            notion_client.update_database(rec["paid_db_id"], notion_schema.PAID_PROPERTIES)
         print(f"schema synced for '{slug}'")
     return rec
 

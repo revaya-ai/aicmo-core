@@ -51,7 +51,9 @@ def push(client: str) -> str:
 
     if notion_client.is_configured():
         page_map = rec.get("page_map", {})
+        paid_map = rec.get("paid_map", {})
         for post in posts:
+            # organic content card
             props = notion_schema.properties_for(post)
             page_id = page_map.get(post["id"])
             if page_id:
@@ -59,7 +61,16 @@ def push(client: str) -> str:
             else:
                 resp = notion_client.create_page(rec["pipeline_db_id"], props)
                 page_map[post["id"]] = resp["id"]
+            # a promoted winner also gets a Paid Ads card (the new component)
+            if post["status"] in notion_schema.AD_STATUS_FROM_PIPELINE:
+                pprops = notion_schema.paid_properties_for(post)
+                ad_id = paid_map.get(post["id"])
+                if ad_id:
+                    notion_client.update_page(ad_id, pprops)
+                else:
+                    paid_map[post["id"]] = notion_client.create_page(rec["paid_db_id"], pprops)["id"]
         rec["page_map"] = page_map
+        rec["paid_map"] = paid_map
         notion_provision.save_client(client, rec)
         return rec["pipeline_db_id"]
 
@@ -108,14 +119,19 @@ def pull_gate(client: str) -> list:
     rec = notion_provision.provision_client(client)
 
     if notion_client.is_configured():
+        # content gate — read from the Content Pipeline (organic)
         for row in notion_client.query_database(rec["pipeline_db_id"]):
             pr = row.get("properties", {})
             post_id = _plain(pr.get("Post ID"))
-            label = _select(pr.get("Status"))
-            comment = _plain(pr.get("Client Comment"))
             if post_id:
-                _apply_decision(post_id, label, comment, applied)
-                _apply_ad_decision(post_id, _select(pr.get("Ad Status")), applied)
+                _apply_decision(post_id, _select(pr.get("Status")),
+                                _plain(pr.get("Client Comment")), applied)
+        # ad-spend gate — read from the Paid Ads DB (the new component)
+        if rec.get("paid_db_id"):
+            for row in notion_client.query_database(rec["paid_db_id"]):
+                pr = row.get("properties", {})
+                _apply_ad_decision(_plain(pr.get("Source Post")),
+                                   _select(pr.get("Ad Status")), applied)
         if applied:
             push(client)  # reflect new states (rejected -> re-drafted In Review)
         return applied
