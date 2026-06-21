@@ -5,6 +5,9 @@ the other builders (Studio / Mission / Ads) write exists here as a defined seam.
 """
 
 
+import json
+
+
 def _select(options):
     return {"select": {"options": [{"name": o} for o in options]}}
 
@@ -34,6 +37,11 @@ PIPELINE_PROPERTIES = {
     "Platform": _select(["LinkedIn", "Instagram", "Meta ad", "X"]),  # Mission/Ads seam
     "CTR": {"number": {}},                                     # Ads seam
     "ROAS": {"number": {}},                                    # Ads seam
+    "Follows": {"number": {}},                                 # stage 6 — the winner metric
+    "Winner": {"checkbox": {}},                                # stage 7 — top 2-3
+    "Ad Status": _select(["Recommended", "Approved", "Live", "Declined"]),  # stages 8-10
+    "Ad Budget": {"number": {}},                               # stage 8
+    "Ad Audience": {"rich_text": {}},                          # stage 8
     "Hashtags": {"rich_text": {}},
     "Folder Path": {"rich_text": {}},                          # seam
     "Scheduled For": {"date": {}},                             # Mission seam
@@ -65,9 +73,31 @@ STATUS_SQLITE_TO_NOTION = {
     "ad_live": "Published",
 }
 
-# The human gate read-back.
+# The human gate read-back (content).
 APPROVE_LABELS = {"Approved": "approved"}        # advance forward
 SEND_BACK_LABELS = {"Rejected", "Needs revision"}  # -> send back to the Brain
+
+# The second human gate read-back (ad spend), set on the "Ad Status" field.
+AD_APPROVE_LABEL = "Approved"     # ad_recommended -> ad_approved
+AD_DECLINE_LABEL = "Declined"     # ad_recommended -> drop the ad (back to analyzed)
+
+# Pipeline status -> Ad Status label (what the board shows for the paid loop).
+AD_STATUS_FROM_PIPELINE = {
+    "ad_recommended": "Recommended",
+    "ad_approved": "Approved",
+    "ad_live": "Live",
+}
+
+
+def _follows(post):
+    """Pull follows-per-post out of metrics_json (set by Mission's analytics)."""
+    mj = post.get("metrics_json")
+    if not mj:
+        return None
+    try:
+        return json.loads(mj).get("follows")
+    except Exception:
+        return None
 
 
 def _rt(text):
@@ -94,6 +124,11 @@ def card_for(post):
         "composite_image": post.get("image_path"),
         "platform": post.get("platform"),
         "published_url": post.get("published_url"),
+        "follows": _follows(post),
+        "winner": post["status"] in AD_STATUS_FROM_PIPELINE,
+        "ad_status_label": AD_STATUS_FROM_PIPELINE.get(post["status"]),
+        "ad_budget": post.get("ad_budget"),
+        "ad_audience": post.get("ad_audience"),
     }
 
 
@@ -127,6 +162,18 @@ def properties_for(post):
         props["Published URL"] = {"url": post["published_url"]}
     if post.get("scheduled_for"):
         props["Scheduled For"] = {"date": {"start": post["scheduled_for"]}}
+
+    # Paid loop (stages 6-10).
+    follows = _follows(post)
+    if follows is not None:
+        props["Follows"] = {"number": follows}
+    if post["status"] in AD_STATUS_FROM_PIPELINE:
+        props["Winner"] = {"checkbox": True}
+        props["Ad Status"] = {"select": {"name": AD_STATUS_FROM_PIPELINE[post["status"]]}}
+    if post.get("ad_budget") is not None:
+        props["Ad Budget"] = {"number": post["ad_budget"]}
+    if post.get("ad_audience"):
+        props["Ad Audience"] = {"rich_text": _rt(post["ad_audience"])}
     return props
 
 

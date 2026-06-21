@@ -88,6 +88,21 @@ def _apply_decision(post_id, label, comment, applied):
         applied.append((post_id, "rejected_and_redrafted"))
 
 
+def _apply_ad_decision(post_id, ad_label, applied):
+    """The second gate (ad spend). Only acts on posts at ad_recommended."""
+    if not post_id or not ad_label:
+        return
+    post = db.get_post(post_id)
+    if not post or post["status"] != db.Status.AD_RECOMMENDED:
+        return
+    if ad_label == notion_schema.AD_APPROVE_LABEL:
+        db.advance(post_id, db.Status.AD_APPROVED, ad_spend_approved_by="client (Notion)")
+        applied.append((post_id, "ad_spend_approved"))
+    elif ad_label == notion_schema.AD_DECLINE_LABEL:
+        db.advance(post_id, db.Status.ANALYZED)  # drop the ad, leave the post analyzed
+        applied.append((post_id, "ad_declined"))
+
+
 def pull_gate(client: str) -> list:
     applied = []
     rec = notion_provision.provision_client(client)
@@ -100,6 +115,7 @@ def pull_gate(client: str) -> list:
             comment = _plain(pr.get("Client Comment"))
             if post_id:
                 _apply_decision(post_id, label, comment, applied)
+                _apply_ad_decision(post_id, _select(pr.get("Ad Status")), applied)
         if applied:
             push(client)  # reflect new states (rejected -> re-drafted In Review)
         return applied
@@ -112,6 +128,7 @@ def pull_gate(client: str) -> list:
     for card in board.get("cards", []):
         _apply_decision(card.get("post_id"), card.get("status_label"),
                         card.get("client_comment"), applied)
+        _apply_ad_decision(card.get("post_id"), card.get("ad_status_label"), applied)
     if applied:
         push(client)  # reflect new states (rejected -> re-drafted In Review)
     return applied

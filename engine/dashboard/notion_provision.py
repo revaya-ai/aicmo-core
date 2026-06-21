@@ -114,6 +114,17 @@ def provision_client(slug: str, kpis=None, client_name=None) -> dict:
     return rec
 
 
+def ensure_schema(slug: str) -> dict:
+    """Bring a client's existing databases up to the current schema (adds any new
+    fields, e.g. the paid-loop properties). Idempotent. Real mode only."""
+    rec = provision_client(slug)
+    if notion_client.is_configured():
+        notion_client.update_database(rec["pipeline_db_id"], notion_schema.PIPELINE_PROPERTIES)
+        notion_client.update_database(rec["metrics_db_id"], notion_schema.METRICS_PROPERTIES)
+        print(f"schema synced for '{slug}'")
+    return rec
+
+
 def save_client(slug: str, rec: dict) -> None:
     state = _load_state()
     state.setdefault("clients", {})[slug] = rec

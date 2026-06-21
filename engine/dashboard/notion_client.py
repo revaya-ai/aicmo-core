@@ -53,6 +53,11 @@ def create_database(parent_page_id: str, title: str, properties: dict) -> dict:
     )
 
 
+def update_database(database_id: str, properties: dict) -> dict:
+    """Add/merge properties on an existing database (Notion keeps existing ones)."""
+    return _request("PATCH", f"/databases/{database_id}", {"properties": properties})
+
+
 def create_page(database_id: str, properties: dict) -> dict:
     return _request(
         "POST",
