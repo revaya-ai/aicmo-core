@@ -38,7 +38,7 @@ def main() -> None:
     db.init_db()
     print(f"\nPosting {n_posts} organic pieces (simulated) and measuring follows...\n")
     for idea in IDEAS[:n_posts]:
-        pid = db.create_post("lumen-skin", idea)
+        pid = db.create_post("lumen-skin", idea, platform="instagram")
         brain.run(pid)            # write
         render.run(pid)           # design
         qc.run(pid)               # brand-check
