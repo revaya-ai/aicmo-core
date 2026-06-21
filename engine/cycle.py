@@ -38,24 +38,34 @@ def sweep(client: str) -> int:
         # Station 1 — Brain: captured -> drafted
         ai_cmo_generate.run(pid)
 
-        # Guardrails: score SEO on the drafted body; store failures in qc_notes
-        body = (db.get_post(pid) or {}).get("body", "") or ""
-        g = seo_guardrails.score(body)
-        if not g["passed"]:
-            db.update_post(pid, qc_notes="seo_fail:" + ",".join(g.get("failures", [])))
-
-        # Compliance gate: flag drug claims for human review (never blocks or redrafts)
-        c = compliance.check(client, body)
-        if not c["passed"]:
-            prior = (db.get_post(pid) or {}).get("qc_notes") or ""
-            flag = "COMPLIANCE_FAIL:" + ";".join(c["violations"])
-            db.update_post(pid, qc_notes=(prior + " " + flag).strip())
-
         # Station 2 — Studio: render image (drafted -> image_path set, status unchanged)
         render.run(pid)
 
         # Station 2 — Studio: brand QC (-> qc_review or needs_revision)
+        # brand_qc writes its own qc_notes via advance(); advisory flags are appended AFTER.
         brand_qc.run(pid)
+
+        # Advisory flags: appended ONLY when brand_qc sent the post to qc_review.
+        # If brand_qc bounced the post (needs_revision), do not annotate — it will be
+        # re-drafted and re-swept; annotating a transient needs_revision note is noise.
+        refreshed = db.get_post(pid) or {}
+        if refreshed.get("status") == Status.QC_REVIEW:
+            body = refreshed.get("body", "") or ""
+
+            # SEO guardrails: flag brand-voice / copy failures for human reviewer
+            g = seo_guardrails.score(body)
+            if not g["passed"]:
+                prior = refreshed.get("qc_notes") or ""
+                seo_flag = "seo_fail:" + ",".join(g.get("failures", []))
+                db.update_post(pid, qc_notes=(prior + " " + seo_flag).strip())
+                refreshed = db.get_post(pid) or {}  # keep refreshed in sync
+
+            # Compliance gate: flag drug claims for human review (never blocks or redrafts)
+            c = compliance.check(client, body)
+            if not c["passed"]:
+                prior = refreshed.get("qc_notes") or ""
+                compliance_flag = "COMPLIANCE_FAIL:" + ";".join(c["violations"])
+                db.update_post(pid, qc_notes=(prior + " " + compliance_flag).strip())
 
     return len(rows)
 

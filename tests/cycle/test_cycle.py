@@ -125,34 +125,43 @@ def test_sweep_idempotent_on_already_swept(isolated):
     assert n2 == 0
 
 
-def test_compliance_flag_surfaces_at_qc_review(monkeypatch, tmp_path):
-    """A post with a drug claim reaches qc_review and carries COMPLIANCE_FAIL in qc_notes."""
-    from engine.studio import brand_qc
+def test_compliance_flag_surfaces_at_qc_review(isolated):
+    """A post with a drug claim reaches qc_review with COMPLIANCE_FAIL appended AFTER brand_qc's note.
 
-    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "t.db"))
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.delenv("NOTION_TOKEN", raising=False)
-
-    from engine.dashboard import notion_provision, notion_sync
-    monkeypatch.setattr(notion_provision, "STATE_PATH", str(tmp_path / "state.json"))
-    monkeypatch.setattr(notion_sync, "OUT_DIR", str(tmp_path / "out"))
-
-    # Stub render (no playwright)
-    monkeypatch.setattr(render, "run", lambda post_id, auto_approve=False: None)
-
-    # Stub brand_qc: advance to qc_review but PRESERVE any existing qc_notes
-    def _stub_brand_qc_preserve(post_id, auto_approve=False):
-        from db import Status, advance
-        existing = (db.get_post(post_id) or {}).get("qc_notes") or ""
-        advance(post_id, Status.QC_REVIEW, qc_score=90, qc_notes=existing or "STUB: test patch")
-
-    monkeypatch.setattr(brand_qc, "run", _stub_brand_qc_preserve)
-
-    db.init_db()
+    Uses the standard isolated fixture (brand_qc stub writes qc_notes="STUB: test patch").
+    The fix: advisory flags are appended after brand_qc runs, so both notes survive.
+    """
     pid = db.create_post("lumen-skin", "this cream cures eczema")  # seed carries a drug claim
     cycle.sweep("lumen-skin")
     post = db.get_post(pid)
-    assert post["status"] == "qc_review"               # still reaches the human
-    # if the drafted body echoes the banned claim, the flag is present
-    if "cure" in (post.get("body") or "").lower():
-        assert "COMPLIANCE_FAIL" in (post.get("qc_notes") or "")
+    assert post["status"] == "qc_review"  # still reaches the human reviewer
+
+    # The body is drafted by the offline ai_cmo_generate stub, which echoes the seed idea.
+    # If the banned term appears in the body, the compliance flag must be present AND
+    # the brand_qc stub note must still be present (proving append, not overwrite).
+    body = (post.get("body") or "").lower()
+    if "cure" in body:
+        qc_notes = post.get("qc_notes") or ""
+        assert "COMPLIANCE_FAIL" in qc_notes, "compliance flag missing from qc_notes"
+        assert "STUB" in qc_notes, "brand_qc note was overwritten instead of appended to"
+
+
+def test_seo_flag_surfaces_at_qc_review(isolated):
+    """A post body that fails SEO guardrails gets seo_fail appended AFTER brand_qc's note.
+
+    The offline stub echoes the seed as the first line of body.  A seed with
+    'we' (trips no_we_voice) and 'leverage' (trips no_banned_phrase) produces
+    a score <= 7 (< 8 = passed threshold), guaranteeing the seo_fail flag fires.
+    """
+    # Seed embeds 'we' (no_we_voice) + 'leverage' (no_banned_phrase) → score 6 → seo_fail
+    pid = db.create_post("lumen-skin", "we leverage synergy for skincare")
+    cycle.sweep("lumen-skin")
+    post = db.get_post(pid)
+    assert post["status"] == "qc_review"
+
+    body = (post.get("body") or "").lower()
+    # Confirm the body actually echoes the banned terms (offline stub invariant)
+    assert "leverage" in body, "offline stub body did not echo seed — test premise broken"
+    qc_notes = post.get("qc_notes") or ""
+    assert "seo_fail" in qc_notes, "seo_fail flag missing from qc_notes"
+    assert "STUB" in qc_notes, "brand_qc note was overwritten instead of appended to"
