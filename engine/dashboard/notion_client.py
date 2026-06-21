@@ -78,6 +78,11 @@ def create_database_in_page(parent_page_id: str, title: str, properties: dict) -
     return create_database(parent_page_id, title, properties)
 
 
+def append_blocks(page_id: str, blocks: list) -> dict:
+    """Append content blocks (headings, callouts, paragraphs) to a page."""
+    return _request("PATCH", f"/blocks/{page_id}/children", {"children": blocks})
+
+
 def search_pages() -> list:
     """Return pages the integration can access."""
     resp = _request("POST", "/search", {"filter": {"property": "object", "value": "page"}})
