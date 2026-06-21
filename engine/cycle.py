@@ -20,7 +20,7 @@ import db
 from db import Status
 from engine.brain import ai_cmo_generate
 from engine.studio import render, brand_qc
-from engine.guardrails import seo_guardrails
+from engine.guardrails import seo_guardrails, compliance
 from engine.dashboard import notion_sync
 from engine.mission import driver
 
@@ -43,6 +43,13 @@ def sweep(client: str) -> int:
         g = seo_guardrails.score(body)
         if not g["passed"]:
             db.update_post(pid, qc_notes="seo_fail:" + ",".join(g.get("failures", [])))
+
+        # Compliance gate: flag drug claims for human review (never blocks or redrafts)
+        c = compliance.check(client, body)
+        if not c["passed"]:
+            prior = (db.get_post(pid) or {}).get("qc_notes") or ""
+            flag = "COMPLIANCE_FAIL:" + ";".join(c["violations"])
+            db.update_post(pid, qc_notes=(prior + " " + flag).strip())
 
         # Station 2 — Studio: render image (drafted -> image_path set, status unchanged)
         render.run(pid)

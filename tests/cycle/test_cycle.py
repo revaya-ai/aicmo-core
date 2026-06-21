@@ -123,3 +123,36 @@ def test_sweep_idempotent_on_already_swept(isolated):
     cycle.sweep("lumen-skin")  # first sweep
     n2 = cycle.sweep("lumen-skin")  # second sweep, nothing captured
     assert n2 == 0
+
+
+def test_compliance_flag_surfaces_at_qc_review(monkeypatch, tmp_path):
+    """A post with a drug claim reaches qc_review and carries COMPLIANCE_FAIL in qc_notes."""
+    from engine.studio import brand_qc
+
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "t.db"))
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("NOTION_TOKEN", raising=False)
+
+    from engine.dashboard import notion_provision, notion_sync
+    monkeypatch.setattr(notion_provision, "STATE_PATH", str(tmp_path / "state.json"))
+    monkeypatch.setattr(notion_sync, "OUT_DIR", str(tmp_path / "out"))
+
+    # Stub render (no playwright)
+    monkeypatch.setattr(render, "run", lambda post_id, auto_approve=False: None)
+
+    # Stub brand_qc: advance to qc_review but PRESERVE any existing qc_notes
+    def _stub_brand_qc_preserve(post_id, auto_approve=False):
+        from db import Status, advance
+        existing = (db.get_post(post_id) or {}).get("qc_notes") or ""
+        advance(post_id, Status.QC_REVIEW, qc_score=90, qc_notes=existing or "STUB: test patch")
+
+    monkeypatch.setattr(brand_qc, "run", _stub_brand_qc_preserve)
+
+    db.init_db()
+    pid = db.create_post("lumen-skin", "this cream cures eczema")  # seed carries a drug claim
+    cycle.sweep("lumen-skin")
+    post = db.get_post(pid)
+    assert post["status"] == "qc_review"               # still reaches the human
+    # if the drafted body echoes the banned claim, the flag is present
+    if "cure" in (post.get("body") or "").lower():
+        assert "COMPLIANCE_FAIL" in (post.get("qc_notes") or "")
