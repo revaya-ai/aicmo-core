@@ -1,75 +1,118 @@
-# Notion Database — Design Spec
+# Notion Database — Design Spec (v2, post-QA)
 
-> Status: approved (Shannon, 2026-06-20). Our deliverable alongside Card 1 (Brain). Built in aicmo-core.
-> Source: Jen's client-workspace screenshots ("(Client) — AI CMO") + the frozen db.py contract.
+> Status: approved direction (Shannon, 2026-06-21). Supersedes the v1 "MVP one database" framing.
+> Our deliverable alongside Card 1 (Brain). Built in aicmo-core. Source: Jen's setup + our build transcript + the QA gap report (docs/qa/notion-design-review.md).
 
 ---
 
 ## Purpose
 
-Give the AI CMO a real Notion surface: the client sees their content pipeline in Notion and approves or rejects each post from their phone. This is Jen's actual selling point ("approve in your real Notion"), and it is the missing piece. SQLite (db.py) stays the engine's source of truth. Notion is the human gate.
+Notion is the per-client client surface AND the hub that connects every builder. The client reviews, comments, approves, and rejects here. SQLite (db.py) stays the engine's source of truth; Notion mirrors both ways.
 
 ## Spine model
 
-SQLite is authoritative. Notion is the human-facing mirror plus a read-back of the one human decision:
-1. Push: posts at `qc_review` appear in Notion as cards, Status "In Review".
-2. Approve: the client flips Status to "Approved" or "Rejected" in Notion.
-3. Read back: a sync reads Notion, finds the decisions, and advances the SQLite record (approved -> `approved`, rejected -> `rejected` with the human note).
+SQLite authoritative. Notion is the human surface plus a read-back of the human decision and the client's comment. Offline STUB mode (JSON) when no token; real Notion API when `NOTION_TOKEN` is set. The pipeline never hard-depends on Notion.
 
-Everything runs offline in STUB mode (JSON file) when no `NOTION_TOKEN` is set, and switches to the real Notion API when the token is present. The pipeline never hard-depends on Notion being up.
+## Architecture: one guest seat per client (full isolation)
 
-## The database (MVP: Content Pipeline)
+Each client gets their **own** client page under the HQ parent, guest-shared to them. Inside it:
+- their **own** Content Pipeline database (same schema for everyone),
+- their **own** Metrics database (the dashboard data),
+- a Brand & Voice page and a Requests area.
 
-One Notion database, "Content Pipeline", matching Jen's screenshot. Properties and their source in our `posts` record:
+No shared database. No client can see another (Jen's "they never mix"). State is client-keyed:
 
-| Notion property | Notion type | From posts |
-|---|---|---|
-| Title | title | derived from hook |
-| Post ID | rich_text | id (maps the card back to SQLite) |
-| Client | select | client |
-| Status | select | status, mapped (see below) |
-| Pillar | select | pillar |
-| Hook | rich_text | hook |
-| Draft Caption | rich_text | body |
-| Brand QC Score | number | qc_score |
-| Brand QC Notes | rich_text | qc_notes |
-| Composite Image | url | image_path |
-| Aspect Ratio | select | (default 1080x1350) |
-| Hashtags | rich_text | (optional) |
-| Folder Path | rich_text | (optional) |
-| Scheduled For | date | scheduled_for |
-| Published URL | url | published_url |
+```
+data/notion_state.json = {
+  "parent_page_id": "...",
+  "clients": {
+    "lumen-skin": {"page_id","pipeline_db_id","metrics_db_id","page_map":{post_id:notion_page_id},"kpis":[...]}
+  }
+}
+```
 
-Status value mapping (SQLite -> Notion label):
-`drafted`->Draft, `qc_review`->In Review, `approved`->Approved, `rejected`->Rejected, `needs_revision`->Needs revision, `scheduled`->Scheduled, `published`->Published, `analyzed`->Analyzed.
-Read-back mapping (Notion label the human sets -> SQLite advance): Approved->`approved`, Rejected->`rejected`, Needs revision->`needs_revision`.
+## The one rule: approve forward, everything else goes back to the Brain
+
+- **Approve** -> the card moves forward (scheduled/publish, owned by Mission).
+- **Comment** -> the client's note is captured as the steering feedback.
+- **Reject** -> status returns to `captured`, the client's comment is stored in `human_note`, the Brain re-runs and folds the note into the next draft.
+- **QC fail** (Studio's vision gate returns fail/borderline) -> identical path: back to `captured`, the QC reason stored in `human_note`, Brain re-drafts. Same `send_back_to_brain(post_id, feedback)` helper as reject.
+
+Off-brand or rejected work never sits; it loops back and the next draft lands closer. This is the feedback loop.
+
+HARD CONSTRAINT (unchanged, verified by QA): no script ever sets a card to `approved`. Only a human-set Status in Notion advances a card, and only from `qc_review`. A QC pass score is not approval.
+
+## Content Pipeline schema (the cross-builder contract)
+
+Every field exists now so the other builders' stations write into the same card. We fill the Brain fields; the rest are defined seams.
+
+| Notion property | Type | From posts | Written by |
+|---|---|---|---|
+| Title | title | derived from hook | Brain |
+| Post ID | rich_text | id | Brain |
+| Client | select | client | Brain |
+| Status | select | status (mapped) | Brain sets In Review; **Client** advances |
+| Pillar | select | pillar | Brain |
+| Angle | rich_text | angle | Brain |
+| Hook | rich_text | hook | Brain |
+| Draft Caption | rich_text | body | Brain |
+| Client Comment | rich_text | human_note (read back) | **Client** -> read by us |
+| Brand QC Score | number | qc_score | Studio (seam) |
+| Brand QC Verdict | select | pass / borderline / fail | Studio (seam) |
+| Composite Image | files (external url) | image_path | Studio (seam) |
+| Aspect Ratio | select | platform format | Studio (seam) |
+| Resize Check | select | organic / paid sizing ok | Studio (seam) |
+| Creative Type | select | UGC / product / video / TV spot | Ads (seam) |
+| Platform | select | linkedin / instagram / meta-ad | Mission/Ads (seam) |
+| CTR | number | click-through rate | Ads (seam) |
+| ROAS | number | return on ad spend | Ads (seam) |
+| Hashtags | rich_text | - | Brain/Studio |
+| Folder Path | rich_text | - | seam |
+| Scheduled For | date | scheduled_for | Mission (seam) |
+| Published URL | url | published_url | Mission (seam) |
+
+Status options: Idea, Draft, In Review, Approved, Rejected, Scheduled, Published, Analyzed.
+SQLite->Notion: captured/idea->Idea, drafted->Draft, qc_review->In Review, approved->Approved, scheduled->Scheduled, published->Published, analyzed->Analyzed.
+Notion->SQLite (the gate read-back): Approved->approved, Rejected-> send back to Brain (captured + comment), Needs revision-> send back to Brain.
+
+## Intake (section 3)
+
+The client adds a row at Status "Idea" (their seed idea). `pull_intake(client)` reads new Idea rows and creates a captured post in SQLite; the Brain picks it up. Two-way surface.
+
+## Dashboard (section 6)
+
+A per-client Metrics database, rows chosen from a standard KPI menu at setup:
+followers, engagement_rate, **website_visits, website_conversions**, top_landing_pages, posts_shipped, leads, seo_rank, aeo_citations, revenue_mrr, ctr, roas.
+
+Each metric row: KPI, Value, Trend, Source (GA4/GSC/social/Stripe/Meta), **Is Mock**. 
+HONESTY GATE: any value not backed by a live integration is marked `Is Mock = true` and labeled, never presented as real. Un-wired KPIs are withheld, not faked. (From section 6 + our transcript.)
+
+Built now: the Metrics DB + KPI selection + a stub metrics push (marked mock). Seam: the real GA4/GSC/social/Stripe wiring and Data Jumbo charts.
 
 ## Components (built in aicmo-core)
 
-1. `engine/dashboard/notion_client.py` — thin Notion API wrapper. Reads `NOTION_TOKEN`. `is_configured()` is true only when a token is set. All HTTP isolated here.
-2. `engine/dashboard/notion_provision.py` — creates the Content Pipeline database under a parent page (`NOTION_PARENT_PAGE_ID`) with the full property schema. Idempotent: records the created database id to `data/notion_state.json` and reuses it. STUB mode prints the schema it would create and writes the state file with a stub id.
-3. `engine/dashboard/notion_sync.py` — `push()` upserts pipeline posts as Notion pages (create if no mapped page, else update), keyed by Post ID. `pull_gate()` reads the database, finds rows whose human-set Status is Approved/Rejected/Needs revision, and advances the matching SQLite record. STUB mode reads/writes `outputs/notion-mirror.json` so the flow is testable offline.
+- `engine/dashboard/kpi_menu.py` (new) — the standard KPI library.
+- `engine/dashboard/notion_schema.py` — full property schema + status maps + payload builders.
+- `engine/dashboard/notion_client.py` — API wrapper + `create_child_page`.
+- `engine/dashboard/notion_provision.py` — `provision_client(slug, kpis)`: child page + pipeline DB + metrics DB; client-keyed state.
+- `engine/dashboard/notion_sync.py` — `push(client)`, `pull_gate(client)` (reads Status + Client Comment; reject -> send back), `pull_intake(client)`, `push_metrics(client)`.
+- `engine/feedback.py` (new) — `send_back_to_brain(post_id, feedback)`: status -> captured, store feedback in human_note. Used by reject AND by Studio's QC-fail.
+- `engine/brain/generate.py` — on re-draft, if `human_note` is set, fold it in as the revision instruction.
 
-(The existing `engine/dashboard/notion_mirror.py` JSON board is the starting point for the stub; notion_sync supersedes it with create/update + read-back.)
+## Image rendering
 
-## Contract additions
-
-The Notion property schema above is the "Notion contract". The page-id mapping (Post ID -> Notion page id) lives in `data/notion_state.json`, gitignored. No change to `db.py`.
-
-## Error handling
-
-- No `NOTION_TOKEN`: run in STUB mode, never touch the network, label output "stub" so no false success.
-- Token set but `NOTION_PARENT_PAGE_ID` missing on provision: fail loud with the exact missing env var.
-- API error on push/pull: surface it, do not silently swallow; the SQLite record is unchanged so a retry is safe.
+Composite Image is a Notion `files` property with an external URL so it renders inline. Local `renders/x.png` paths show as text until Studio provides a hosted URL (documented seam).
 
 ## Verification (definition of done)
 
-STUB mode (no token), end to end:
-1. Run the loop so posts exist; run `notion_provision.py` -> writes `data/notion_state.json` with a stub database id and prints the schema.
-2. `notion_sync.py push` -> writes `outputs/notion-mirror.json` containing a card per pipeline post with the mapped Status labels.
-3. Simulate a human approval in the stub board (flip a card to Approved), run `notion_sync.py pull` -> the matching SQLite post advances to `approved`.
-4. Real mode is exercised only when `NOTION_TOKEN` + `NOTION_PARENT_PAGE_ID` are set; same card shape, no downstream change.
+STUB (no token):
+1. `provision_client("lumen-skin", kpis)` -> writes client-keyed state with stub ids; prints the pipeline + metrics schema.
+2. Generate a post to qc_review; `push("lumen-skin")` -> board JSON with the card at "In Review".
+3. Set the stub card to "Rejected" + a comment -> `pull_gate("lumen-skin")` -> post returns to `captured` with the comment in `human_note`; re-running Brain produces a revised draft that references the note.
+4. `push_metrics("lumen-skin")` -> metrics rows, mock ones marked.
 
-## Prerequisite for the live demo
+REAL (token set): same calls hit Notion; per-client page + DBs created; card approve/reject round-trips.
 
-A Notion internal integration token (`NOTION_TOKEN`) and a parent page shared with the integration (`NOTION_PARENT_PAGE_ID`). Not needed to build or test in stub mode.
+## Prerequisite for live
+
+`NOTION_TOKEN` + a parent page shared with the integration (`NOTION_PARENT_PAGE_ID`, or auto-discovered).

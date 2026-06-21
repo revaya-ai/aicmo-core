@@ -61,6 +61,29 @@ def create_page(database_id: str, properties: dict) -> dict:
     )
 
 
+def create_child_page(parent_page_id: str, title: str) -> dict:
+    """Create a regular page nested under another page (the client's guest seat)."""
+    return _request(
+        "POST",
+        "/pages",
+        {
+            "parent": {"type": "page_id", "page_id": parent_page_id},
+            "properties": {"title": [{"type": "text", "text": {"content": title}}]},
+        },
+    )
+
+
+def create_database_in_page(parent_page_id: str, title: str, properties: dict) -> dict:
+    """Create a database inside a page (alias of create_database for clarity)."""
+    return create_database(parent_page_id, title, properties)
+
+
+def search_pages() -> list:
+    """Return pages the integration can access."""
+    resp = _request("POST", "/search", {"filter": {"property": "object", "value": "page"}})
+    return resp.get("results", [])
+
+
 def update_page(page_id: str, properties: dict) -> dict:
     return _request("PATCH", f"/pages/{page_id}", {"properties": properties})
 

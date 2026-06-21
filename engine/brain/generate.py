@@ -98,12 +98,13 @@ def pick_pillar(pillars: list, seed: str) -> str:
     return pillars[index]
 
 
-def generate_draft(seed: str, context: dict) -> dict:
+def generate_draft(seed: str, context: dict, feedback: str = None) -> dict:
     """Build pillar, angle, hook, body from the seed plus the loaded context.
 
     context carries: pillars (list), audience (str), is_anti_hype (bool from
     voice.md). The output references the real audience and pillar so it is
-    grounded, not a constant.
+    grounded, not a constant. If feedback is set (a reject comment or a QC-fail
+    reason), the re-draft folds it in.
     """
     premise = seed.strip()
     pillars = context.get("pillars") or []
@@ -126,6 +127,14 @@ def generate_draft(seed: str, context: dict) -> dict:
         "weeks.\n\n"
         "Simple beats fancy. That is the Lumen Skin Studio way."
     )
+
+    if feedback:
+        # Re-draft after a reject or QC fail. The model-driven /ai-cmo-generate
+        # command rewrites for real; this offline stand-in shows the correction
+        # took effect so the loop is testable.
+        note = feedback.strip()
+        angle = f"{angle} Revised per feedback: {note}"
+        body = f"{body}\n\n(Revised to address: {note})"
 
     return {"pillar": pillar, "angle": angle, "hook": hook, "body": body}
 
@@ -152,7 +161,10 @@ def run(post_id: str, auto_approve: bool = False) -> None:
     }
 
     # --- Bricks: Topic -> Angle -> Hook -> Story -------------------------
-    draft = generate_draft(seed, context)
+    # If this post was sent back (reject or QC fail), human_note carries the
+    # feedback; fold it into the re-draft so the next version responds to it.
+    feedback = post.get("human_note")
+    draft = generate_draft(seed, context, feedback=feedback)
 
     advance(
         post_id,
