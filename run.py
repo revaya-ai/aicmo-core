@@ -16,7 +16,7 @@ import db
 from db import get_post
 
 # Stations, in pipeline order. Each is a module exposing run(post_id, auto_approve).
-from engine.brain import generate as brain_generate
+from engine.brain import ai_cmo_generate as brain_generate
 from engine.studio import render as studio_render
 from engine.studio import brand_qc as studio_brand_qc
 from engine.mission import gate as mission_gate
