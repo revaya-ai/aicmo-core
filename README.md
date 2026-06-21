@@ -2,11 +2,12 @@
 
 **The AI CMO.** A content marketing department that runs as software.
 
-This is the hackathon skeleton. One content idea ("a post") is a single database
+This is the hackathon build. One content idea ("a post") is a single database
 row that walks through a status pipeline. Each station reads the row at one
-status, does its job, and advances it to the next. Today every station is a
-**stub** that returns canned data. Builders swap stubs for real logic without
-ever touching the contract.
+status, does its job, and advances it to the next. **Two pieces are now real:
+Station 1 (the Brain) and the Notion database, both built by our team** (see
+"What our team built" below). The remaining stations are still stubs that return
+canned data, swapped for real logic without ever touching the contract.
 
 ## Who this is for (ICP)
 A small business with a marketing team of one, or a founder who can't afford a
@@ -16,6 +17,80 @@ on the winners.
 
 Demo client: **Lumen Skin Studio**, a small-batch skincare brand
 (`client-data/lumen-skin/`).
+
+---
+
+## What our team built (Card 1: Brain + the Notion database)
+
+Our team owns two pieces. Both are real (not stubs), verified, and pushed. This
+section is what we present.
+
+### 1. The Brain (Station 1) — idea to on-brand draft
+
+**What it is:** the "Think + Write" station. It turns a typed seed idea into an
+on-brand drafted post, grounded in the client's own brand files, using the Brick
+chain. No generic AI mush, because every post is five locked decisions before a
+word is written.
+
+- **The craft** lives in `.claude/skills/`: `content-os` (the 5-step Brick chain:
+  Voice-of-Customer → Intake → Topic → Angle → Hook → Story), `writing-style`
+  (anti-AI-slop), `positioning-angles`, `hook-library`, `story-structures`.
+- **The command** `/ai-cmo-generate "<seed idea>"` runs the chain in Claude Code,
+  loads the 6-layer client context, and persists the draft via
+  `engine/save_draft.py`.
+- **The offline engine** `engine/brain/generate.py` + `voc.py` parse the real
+  client context (pillars, audience, voice) and produce a grounded draft with no
+  API key, so the pipeline is testable offline.
+
+Run it (offline, no keys):
+
+```bash
+python3 run.py "why competitors all sound the same"     # full loop; Brain is the first real station
+# or persist a draft the exact way the command does:
+python3 engine/save_draft.py --client lumen-skin --seed "..." \
+  --pillar "Education" --angle "..." --hook "..." --body "..."
+```
+
+**How to present it:** "Marketing's bottleneck was never the writing, it was the
+deciding. The Brain makes five locked decisions, pillar, angle, hook, story,
+grounded in the client's own brand files, before it writes a word."
+
+### 2. The Notion database (the human gate + client surface)
+
+**What it is:** the client's real Notion board where every post lives and where
+the one human decision happens, Approve or Reject, from a phone. SQLite stays the
+engine's source of truth; Notion is the human surface, with a read-back that
+turns the client's tap into a pipeline advance.
+
+- `engine/dashboard/notion_provision.py` — creates the Content Pipeline database
+  (the columns from Jen's board) in your Notion page.
+- `engine/dashboard/notion_sync.py` — `push` (pipeline → board) and `pull` (the
+  client's Approve/Reject → advances SQLite).
+- `engine/dashboard/notion_schema.py` — property schema + status maps.
+  `notion_client.py` — the API wrapper (stdlib, no extra install).
+
+Run it (offline stub, no Notion account needed):
+
+```bash
+python3 engine/dashboard/notion_provision.py     # prints the schema, writes a stub db id
+python3 engine/dashboard/notion_sync.py push     # writes outputs/notion-mirror.json (the stub board)
+# flip a card's status_label to "Approved" to simulate the client, then:
+python3 engine/dashboard/notion_sync.py pull     # advances the matching post to approved
+```
+
+**Go live:** set `NOTION_TOKEN` + `NOTION_PARENT_PAGE_ID`, then the same commands
+hit the real Notion API. Same card shape, nothing downstream changes.
+
+**How to present it:** "Six steps run themselves, the seventh is a person. They
+open Notion, tap Approve, and the post ships. We built the board, the push, and
+the read-back. One tap, eight seconds, from anywhere."
+
+### Notion or a custom app?
+
+Notion is the fast surface and it is what we demo. But SQLite is the source of
+truth and Notion is just one surface hanging off `notion_sync`. For a real $1M
+client you put a branded app on the same engine, no change to the Brain or the
+pipeline. The database was never the product. The engine was.
 
 ## The contract-first rule
 `db.py` is the **frozen contract**. It defines the `posts` table, the `Status`
